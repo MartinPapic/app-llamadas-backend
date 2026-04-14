@@ -4,6 +4,8 @@ import com.cem.appllamadasbackend.domain.model.Contacto
 import com.cem.appllamadasbackend.domain.model.Llamada
 import com.cem.appllamadasbackend.domain.repository.ContactoRepository
 import com.cem.appllamadasbackend.domain.repository.LlamadaRepository
+import com.cem.appllamadasbackend.domain.model.Encuesta
+import com.cem.appllamadasbackend.domain.repository.EncuestaRepository
 import com.cem.appllamadasbackend.domain.model.Usuario
 import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
 import org.springframework.http.ResponseEntity
@@ -23,7 +25,8 @@ data class MetricasResponse(
 class DashboardController(
     private val contactoRepository: ContactoRepository,
     private val llamadaRepository: LlamadaRepository,
-    private val usuarioRepository: UsuarioRepository
+    private val usuarioRepository: UsuarioRepository,
+    private val encuestaRepository: EncuestaRepository
 ) {
 
     @GetMapping("/metrics")
@@ -78,4 +81,8 @@ class DashboardController(
         }
         return ResponseEntity.ok(respuesta)
     }
+
+    @GetMapping("/admin/surveys")
+    fun getEncuestas(): ResponseEntity<List<Encuesta>> =
+        ResponseEntity.ok(encuestaRepository.findAll())
 }
