@@ -21,20 +21,27 @@ class DataInitializer(
 
     override fun run(vararg args: String?) {
         val adminEmail = System.getenv("ADMIN_SEED_EMAIL") ?: "admin@cem.cl"
-        val adminPassword = System.getenv("ADMIN_SEED_PASSWORD") ?: "REMOVED_SECRET"
+        val adminPassword = System.getenv("ADMIN_SEED_PASSWORD") ?: return // No crear ni actualizar si no hay variable
 
-        if (usuarioRepository.findByEmail(adminEmail).isEmpty) {
+        val existente = usuarioRepository.findByEmail(adminEmail)
+        if (existente.isPresent) {
+            // Actualiza contraseña y rol del admin existente para corregir datos obsoletos
+            val admin = existente.get().copy(
+                passwordHash = passwordEncoder.encode(adminPassword),
+                rol = RolUsuario.ADMIN
+            )
+            usuarioRepository.save(admin)
+            println("✅ [DataInitializer] Admin actualizado: $adminEmail")
+        } else {
             val admin = Usuario(
-                id = UUID.randomUUID().toString(),
+                id = java.util.UUID.randomUUID().toString(),
                 nombre = "Administrador CEM",
                 email = adminEmail,
                 passwordHash = passwordEncoder.encode(adminPassword),
-                rol = RolUsuario.ADMIN  // JwtFilter lo convierte a ROLE_ADMIN
+                rol = RolUsuario.ADMIN
             )
             usuarioRepository.save(admin)
             println("✅ [DataInitializer] Usuario admin creado: $adminEmail")
-        } else {
-            println("ℹ️ [DataInitializer] Usuario admin ya existe, omitiendo seed.")
         }
     }
 }
