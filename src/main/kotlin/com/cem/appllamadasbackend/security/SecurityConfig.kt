@@ -25,6 +25,7 @@ class SecurityConfig(private val jwtFilter: JwtFilter) {
                     .requestMatchers("/actuator/health").permitAll()
                     // rutas del dashboard accesibles solo para admins
                     .requestMatchers("/api/dashboard/**").hasRole("ADMIN")
+                    .requestMatchers("/api/usuarios/**").hasRole("ADMIN")
                     // el resto requiere autenticación
                     .anyRequest().authenticated()
             }
