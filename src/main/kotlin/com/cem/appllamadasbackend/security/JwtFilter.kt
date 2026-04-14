@@ -34,11 +34,15 @@ class JwtFilter(private val jwtService: JwtService) : OncePerRequestFilter() {
 
         val email = jwtService.extractEmail(token)
         val rol   = jwtService.extractRol(token)
+        val authName = "ROLE_${rol.uppercase()}"
+
+        // DEBUG: Imprimir el rol extraído y las autoridades inyectadas
+        println("🔐 [JwtFilter] Email extraído: $email | Rol extraído: $rol | Autoridad concedida: $authName | Endpoint: ${request.requestURI}")
 
         val auth = UsernamePasswordAuthenticationToken(
             email,
             null,
-            listOf(SimpleGrantedAuthority("ROLE_${rol.uppercase()}"))
+            listOf(SimpleGrantedAuthority(authName))
         )
         auth.details = WebAuthenticationDetailsSource().buildDetails(request)
         SecurityContextHolder.getContext().authentication = auth
