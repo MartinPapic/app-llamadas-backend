@@ -10,6 +10,7 @@ class WebConfig : WebMvcConfigurer {
         registry.addMapping("/**")
             .allowedOriginPatterns(
                 "http://localhost:3000",
+                "http://127.0.0.1:3000",
                 "https://app-llamadas-dashboard.vercel.app",
                 "https://*.vercel.app"
             )
