@@ -8,6 +8,8 @@ import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Component
 import java.util.UUID
 
+import org.springframework.jdbc.core.JdbcTemplate
+
 /**
  * Siembra un usuario administrador por defecto al arrancar si no existe ninguno.
  * Credenciales: admin@cem.cl / REMOVED_SECRET
@@ -16,10 +18,23 @@ import java.util.UUID
 @Component
 class DataInitializer(
     private val usuarioRepository: UsuarioRepository,
-    private val passwordEncoder: PasswordEncoder
+    private val passwordEncoder: PasswordEncoder,
+    private val jdbcTemplate: JdbcTemplate
 ) : CommandLineRunner {
 
     override fun run(vararg args: String?) {
+        try {
+            // Limpia los datos existentes (de pruebas antiguas) conviertiendo todo a mayusculas
+            // para que los mappings strictos de enum en JPA no crasheen con 500
+            jdbcTemplate.execute("UPDATE usuario SET rol = UPPER(rol)")
+            jdbcTemplate.execute("UPDATE contacto SET estado = UPPER(estado)")
+            // llamada puede tener resultado null, así que ignorar nulls para no romper cosas
+            jdbcTemplate.execute("UPDATE llamada SET resultado = UPPER(resultado) WHERE resultado IS NOT NULL")
+            jdbcTemplate.execute("UPDATE encuesta SET estado = UPPER(estado) WHERE estado IS NOT NULL")
+            println("✅ [DataInitializer] Integridad de datos completada (Enums actualizados a UPPERCASE)")
+        } catch (e: Exception) {
+            System.err.println("⚠️ [DataInitializer] Falló limpiar enums de la base de datos: ${e.message}")
+        }
         val adminEmail = System.getenv("ADMIN_SEED_EMAIL") ?: "admin@cem.cl"
         val adminPassword = System.getenv("ADMIN_SEED_PASSWORD") ?: return // No crear ni actualizar si no hay variable
 

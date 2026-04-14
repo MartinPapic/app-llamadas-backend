@@ -26,6 +26,7 @@ class SecurityConfig(private val jwtFilter: JwtFilter) {
                 auth
                     .requestMatchers("/auth/**").permitAll()
                     .requestMatchers("/actuator/health").permitAll()
+                    .requestMatchers("/error").permitAll()
                     // Rutas de agente (App Móvil)
                     .requestMatchers("/contacts/**", "/contactos/**", "/calls", "/sync", "/encuestas").hasRole("AGENTE")
                     // Rutas del dashboard (solo ADMIN)
