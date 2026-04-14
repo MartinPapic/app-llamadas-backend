@@ -73,7 +73,8 @@ class DashboardController(
 
     @GetMapping("/admin/agents")
     fun getAgentes(): ResponseEntity<List<Map<String, String>>> {
-        val agentes = usuarioRepository.findAll().filter { it.rol == RolUsuario.AGENTE }
+        // Enviar todos (ADMIN y AGENTE) para que el CSV pueda emparejar contactos a admins testeando.
+        val agentes = usuarioRepository.findAll()
         val respuesta = agentes.map {
             mapOf(
                 "id" to it.id,
