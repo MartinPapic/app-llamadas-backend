@@ -17,7 +17,11 @@ class JwtService(
     @Value("\${jwt.refresh-expiration-ms}") private val refreshExpirationMs: Long
 ) {
     private val signingKey by lazy {
-        val keyBytes = Base64.getDecoder().decode(secret)
+        val keyBytes = try {
+            Base64.getDecoder().decode(secret)
+        } catch (e: IllegalArgumentException) {
+            secret.toByteArray(Charsets.UTF_8) // Aceptar secreto como texto plano también
+        }
         Keys.hmacShaKeyFor(keyBytes)
     }
 
