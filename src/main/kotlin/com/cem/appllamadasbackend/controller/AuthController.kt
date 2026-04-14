@@ -34,7 +34,7 @@ data class RegisterRequest(
 // ─── Controller ──────────────────────────────────────────────────────────────
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/auth")
 class AuthController(
     private val usuarioRepository: UsuarioRepository,
     private val jwtService: JwtService,

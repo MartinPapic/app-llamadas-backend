@@ -21,11 +21,12 @@ class SecurityConfig(private val jwtFilter: JwtFilter) {
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests { auth ->
                 auth
-                    .requestMatchers("/api/auth/**").permitAll()
+                    .requestMatchers("/auth/**").permitAll()
                     .requestMatchers("/actuator/health").permitAll()
                     // rutas del dashboard accesibles solo para admins
-                    .requestMatchers("/api/dashboard/**").hasRole("ADMIN")
-                    .requestMatchers("/api/usuarios/**").hasRole("ADMIN")
+                    .requestMatchers("/metrics").hasRole("ADMIN")
+                    .requestMatchers("/admin/**").hasRole("ADMIN")
+                    .requestMatchers("/usuarios/**").hasRole("ADMIN")
                     // el resto requiere autenticación
                     .anyRequest().authenticated()
             }

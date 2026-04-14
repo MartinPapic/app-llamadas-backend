@@ -12,7 +12,7 @@ import com.cem.appllamadasbackend.domain.repository.EncuestaRepository
 import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/")
 class SyncController(
     private val contactoRepository: ContactoRepository,
     private val llamadaRepository: LlamadaRepository,
@@ -112,8 +112,8 @@ class SyncController(
         return ResponseEntity.ok(mapOf("mensaje" to "${entidades.size} encuestas sincronizadas"))
     }
 
-    // ─── GET /api/contactos — lista de contactos (con filtro opcional) ─────────
-    @GetMapping("/contactos")
+    // ─── GET /contacts — lista de contactos (con filtro opcional) ─────────
+    @GetMapping("/contacts")
     fun getContactos(
         @RequestParam(required = false) estado: String?,
         @AuthenticationPrincipal email: String
@@ -130,7 +130,15 @@ class SyncController(
         return ResponseEntity.ok(resultado)
     }
 
-    // ─── GET /api/contactos/pendientes — alias para compatibilidad ────────────
+    // ─── GET /contacts/{id} — detalle de contacto ───────────────────────────
+    @GetMapping("/contacts/{id}")
+    fun getContactoById(@PathVariable id: String): ResponseEntity<Contacto> {
+        return contactoRepository.findById(id)
+            .map { ResponseEntity.ok(it) }
+            .orElse(ResponseEntity.notFound().build())
+    }
+
+    // ─── GET /contactos/pendientes — alias para compatibilidad ────────────
     @GetMapping("/contactos/pendientes")
     fun getContactosPendientes(@AuthenticationPrincipal email: String): ResponseEntity<List<Contacto>> {
         val usuario = usuarioRepository.findByEmail(email).orElse(null)
@@ -142,8 +150,8 @@ class SyncController(
         return ResponseEntity.ok(pendientes)
     }
 
-    // ─── GET /api/llamadas — historial de llamadas ────────────────────────────
-    @GetMapping("/llamadas")
+    // ─── GET /calls — historial de llamadas ────────────────────────────
+    @GetMapping("/calls")
     fun getLlamadas(
         @RequestParam(required = false) contactoId: String?
     ): ResponseEntity<List<Llamada>> {

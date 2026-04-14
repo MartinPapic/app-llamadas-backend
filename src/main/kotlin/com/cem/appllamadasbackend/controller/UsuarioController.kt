@@ -30,7 +30,7 @@ data class ActualizarUsuarioRequest(
 )
 
 @RestController
-@RequestMapping("/api/usuarios")
+@RequestMapping("/usuarios")
 class UsuarioController(
     private val usuarioRepository: UsuarioRepository,
     private val passwordEncoder: PasswordEncoder

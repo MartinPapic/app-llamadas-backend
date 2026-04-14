@@ -19,14 +19,14 @@ data class MetricasResponse(
 )
 
 @RestController
-@RequestMapping("/api/dashboard")
+@RequestMapping("/")
 class DashboardController(
     private val contactoRepository: ContactoRepository,
     private val llamadaRepository: LlamadaRepository,
     private val usuarioRepository: UsuarioRepository
 ) {
 
-    @GetMapping("/metricas")
+    @GetMapping("/metrics")
     fun getMetricas(): ResponseEntity<MetricasResponse> {
         val totalContactos = contactoRepository.count()
         val todasLlamadas  = llamadaRepository.findAll()
@@ -48,25 +48,25 @@ class DashboardController(
         ))
     }
 
-    @GetMapping("/llamadas")
+    @GetMapping("/admin/calls")
     fun getLlamadas(): ResponseEntity<List<Llamada>> =
         ResponseEntity.ok(llamadaRepository.findAll())
 
-    @GetMapping("/contactos")
+    @GetMapping("/admin/contacts")
     fun getContactos(): ResponseEntity<List<Contacto>> =
         ResponseEntity.ok(contactoRepository.findAll())
 
-    @PostMapping("/contactos")
+    @PostMapping("/admin/contacts")
     fun crearContacto(@RequestBody contacto: Contacto): ResponseEntity<Contacto> =
         ResponseEntity.ok(contactoRepository.save(contacto))
 
-    @PostMapping("/contactos/upload")
+    @PostMapping("/admin/contacts/upload")
     fun uploadContactos(@RequestBody contactos: List<Contacto>): ResponseEntity<Map<String, Any>> {
         val saved = contactoRepository.saveAll(contactos)
         return ResponseEntity.ok(mapOf("mensaje" to "Contactos importados exitosamente", "cantidad" to saved.size))
     }
 
-    @GetMapping("/agentes")
+    @GetMapping("/admin/agents")
     fun getAgentes(): ResponseEntity<List<Map<String, String>>> {
         val agentes = usuarioRepository.findAll().filter { it.rol.lowercase() == "agente" }
         val respuesta = agentes.map {
