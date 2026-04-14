@@ -3,6 +3,8 @@ package com.cem.appllamadasbackend.domain.model
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
 import jakarta.persistence.Table
+import jakarta.persistence.Enumerated
+import jakarta.persistence.EnumType
 
 @Entity
 @Table(name = "llamada")
@@ -14,7 +16,8 @@ data class Llamada(
     val fechaInicio: Long = 0L,
     val fechaFin: Long? = null,
     val duracion: Int? = null,
-    val resultado: String? = null,
+    @Enumerated(EnumType.STRING)
+    val resultado: ResultadoLlamada? = null,
     val tipificacion: String? = null,
     val observacion: String? = null
 )

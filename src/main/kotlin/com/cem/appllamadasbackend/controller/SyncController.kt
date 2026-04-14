@@ -6,6 +6,9 @@ import com.cem.appllamadasbackend.domain.repository.ContactoRepository
 import com.cem.appllamadasbackend.domain.repository.LlamadaRepository
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.transaction.annotation.Transactional
+import com.cem.appllamadasbackend.domain.model.ResultadoLlamada
+import com.cem.appllamadasbackend.domain.model.EstadoContacto
 
 import org.springframework.web.bind.annotation.*
 import com.cem.appllamadasbackend.domain.repository.EncuestaRepository
@@ -61,34 +64,58 @@ class SyncController(
         }
     }
 
-    // ─── POST /api/sync — sincronización batch ────────────────────────────────
     @PostMapping("/sync")
+    @Transactional
     fun syncData(
         @RequestBody payload: SyncPayload,
         @AuthenticationPrincipal email: String
     ): ResponseEntity<SyncResponse> {
         return try {
-            // Persistir contactos actualizados sin perder el agenteId
-            if (payload.contactosActualizados.isNotEmpty()) {
-                val ids = payload.contactosActualizados.map { it.id }
-                val mapExistentes = contactoRepository.findAllById(ids).associateBy { it.id }
-                
-                val contactosToSave = payload.contactosActualizados.map { dto ->
-                     val existente = mapExistentes[dto.id]
-                     existente?.copy(
-                         estado = dto.estado,
-                         intentos = dto.intentos
-                     ) ?: dto
-                }
-                contactoRepository.saveAll(contactosToSave)
-            }
-            // Persistir llamadas
+            // 1. Persistir llamadas primero
             if (payload.llamadas.isNotEmpty()) {
                 llamadaRepository.saveAll(payload.llamadas)
             }
 
+            // 2. Control Server-Side de estados (Authoritative State)
+            if (payload.llamadas.isNotEmpty()) {
+                payload.llamadas.groupBy { it.contactoId }.forEach { (contactoId, llamadas) ->
+                    val contactoOpt = contactoRepository.findById(contactoId)
+                    if (contactoOpt.isPresent) {
+                        val contacto = contactoOpt.get()
+                        val huboExito = llamadas.any { it.resultado == ResultadoLlamada.CONTESTA }
+                        
+                        if (huboExito) {
+                            contacto.estado = EstadoContacto.CONTACTADO
+                        } else if (contacto.intentos >= 5) {
+                            contacto.estado = EstadoContacto.DESISTIDO
+                        } else if (contacto.estado == EstadoContacto.PENDIENTE) {
+                            contacto.estado = EstadoContacto.EN_GESTION
+                        }
+
+                        // Actualizar la fecha de última modificación o re-guardar
+                        contactoRepository.save(contacto)
+                    }
+                }
+            }
+
+            // 3. Persistir intentos (si el cliente mandó contactos actualizados sin llamadas)
+            if (payload.contactosActualizados.isNotEmpty()) {
+                val ids = payload.contactosActualizados.map { it.id }
+                val mapExistentes = contactoRepository.findAllById(ids).associateBy { it.id }
+                
+                val contactosToSave = payload.contactosActualizados.mapNotNull { dto ->
+                     val existente = mapExistentes[dto.id]
+                     if (existente != null && existente.estado != EstadoContacto.CONTACTADO && existente.estado != EstadoContacto.DESISTIDO) {
+                         existente.intentos = dto.intentos
+                         // Asegurarse de no sobrescribir el estado calculado
+                         existente
+                     } else null
+                }
+                contactoRepository.saveAll(contactosToSave)
+            }
+
             val ids = payload.llamadas.map { it.id }
-            ResponseEntity.ok(SyncResponse(true, "Sync exitoso: ${ids.size} llamadas", ids))
+            ResponseEntity.ok(SyncResponse(true, "Sync exitoso: ${ids.size} llamadas procesadas", ids))
         } catch (e: Exception) {
             e.printStackTrace()
             ResponseEntity.internalServerError()
