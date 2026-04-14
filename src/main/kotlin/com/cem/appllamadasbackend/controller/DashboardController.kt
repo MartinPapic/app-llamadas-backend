@@ -4,6 +4,8 @@ import com.cem.appllamadasbackend.domain.model.Contacto
 import com.cem.appllamadasbackend.domain.model.Llamada
 import com.cem.appllamadasbackend.domain.repository.ContactoRepository
 import com.cem.appllamadasbackend.domain.repository.LlamadaRepository
+import com.cem.appllamadasbackend.domain.model.Usuario
+import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
@@ -20,7 +22,8 @@ data class MetricasResponse(
 @RequestMapping("/api/dashboard")
 class DashboardController(
     private val contactoRepository: ContactoRepository,
-    private val llamadaRepository: LlamadaRepository
+    private val llamadaRepository: LlamadaRepository,
+    private val usuarioRepository: UsuarioRepository
 ) {
 
     @GetMapping("/metricas")
@@ -56,4 +59,23 @@ class DashboardController(
     @PostMapping("/contactos")
     fun crearContacto(@RequestBody contacto: Contacto): ResponseEntity<Contacto> =
         ResponseEntity.ok(contactoRepository.save(contacto))
+
+    @PostMapping("/contactos/upload")
+    fun uploadContactos(@RequestBody contactos: List<Contacto>): ResponseEntity<Map<String, Any>> {
+        val saved = contactoRepository.saveAll(contactos)
+        return ResponseEntity.ok(mapOf("mensaje" to "Contactos importados exitosamente", "cantidad" to saved.size))
+    }
+
+    @GetMapping("/agentes")
+    fun getAgentes(): ResponseEntity<List<Map<String, String>>> {
+        val agentes = usuarioRepository.findAll().filter { it.rol.lowercase() == "agente" }
+        val respuesta = agentes.map {
+            mapOf(
+                "id" to it.id,
+                "nombre" to it.nombre,
+                "email" to it.email
+            )
+        }
+        return ResponseEntity.ok(respuesta)
+    }
 }

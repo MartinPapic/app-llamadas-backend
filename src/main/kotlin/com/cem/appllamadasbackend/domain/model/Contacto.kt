@@ -13,5 +13,6 @@ data class Contacto(
     val telefono: String = "",
     val estado: String = "", // pendiente, en_gestion, contactado, desistido
     val intentos: Int = 0,
-    val fechaCreacion: Long = 0L
+    val fechaCreacion: Long = 0L,
+    val agenteId: String? = null
 )

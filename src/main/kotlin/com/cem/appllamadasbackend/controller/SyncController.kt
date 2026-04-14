@@ -8,12 +8,14 @@ import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.web.bind.annotation.*
+import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
 
 @RestController
 @RequestMapping("/api")
 class SyncController(
     private val contactoRepository: ContactoRepository,
-    private val llamadaRepository: LlamadaRepository
+    private val llamadaRepository: LlamadaRepository,
+    private val usuarioRepository: UsuarioRepository
 ) {
 
     // ─── DTOs ─────────────────────────────────────────────────────────────────
@@ -73,9 +75,13 @@ class SyncController(
     // ─── GET /api/contactos — lista de contactos (con filtro opcional) ─────────
     @GetMapping("/contactos")
     fun getContactos(
-        @RequestParam(required = false) estado: String?
+        @RequestParam(required = false) estado: String?,
+        @AuthenticationPrincipal email: String
     ): ResponseEntity<List<Contacto>> {
-        val todos = contactoRepository.findAll()
+        val usuario = usuarioRepository.findByEmail(email).orElse(null)
+            ?: return ResponseEntity.status(401).build()
+
+        val todos = contactoRepository.findAll().filter { it.agenteId == usuario.id }
         val resultado = if (estado != null) {
             todos.filter { it.estado.equals(estado, ignoreCase = true) }
         } else {
@@ -86,9 +92,12 @@ class SyncController(
 
     // ─── GET /api/contactos/pendientes — alias para compatibilidad ────────────
     @GetMapping("/contactos/pendientes")
-    fun getContactosPendientes(): ResponseEntity<List<Contacto>> {
+    fun getContactosPendientes(@AuthenticationPrincipal email: String): ResponseEntity<List<Contacto>> {
+        val usuario = usuarioRepository.findByEmail(email).orElse(null)
+            ?: return ResponseEntity.status(401).build()
+
         val pendientes = contactoRepository.findAll().filter {
-            it.estado != "desistido" && it.estado != "contactado"
+            it.agenteId == usuario.id && it.estado != "desistido" && it.estado != "contactado"
         }
         return ResponseEntity.ok(pendientes)
     }
