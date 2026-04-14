@@ -6,7 +6,7 @@ import com.cem.appllamadasbackend.domain.repository.ContactoRepository
 import com.cem.appllamadasbackend.domain.repository.LlamadaRepository
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
-import org.springframework.security.core.userdetails.UserDetails
+
 import org.springframework.web.bind.annotation.*
 import com.cem.appllamadasbackend.domain.repository.EncuestaRepository
 import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
@@ -49,7 +49,7 @@ class SyncController(
     @PostMapping("/calls")
     fun registrarLlamada(
         @RequestBody llamada: Llamada,
-        @AuthenticationPrincipal user: UserDetails
+        @AuthenticationPrincipal email: String
     ): ResponseEntity<Map<String, Any>> {
         return try {
             val saved = llamadaRepository.save(llamada)
@@ -65,12 +65,22 @@ class SyncController(
     @PostMapping("/sync")
     fun syncData(
         @RequestBody payload: SyncPayload,
-        @AuthenticationPrincipal user: UserDetails
+        @AuthenticationPrincipal email: String
     ): ResponseEntity<SyncResponse> {
         return try {
-            // Persistir contactos actualizados
+            // Persistir contactos actualizados sin perder el agenteId
             if (payload.contactosActualizados.isNotEmpty()) {
-                contactoRepository.saveAll(payload.contactosActualizados)
+                val ids = payload.contactosActualizados.map { it.id }
+                val mapExistentes = contactoRepository.findAllById(ids).associateBy { it.id }
+                
+                val contactosToSave = payload.contactosActualizados.map { dto ->
+                     val existente = mapExistentes[dto.id]
+                     existente?.copy(
+                         estado = dto.estado,
+                         intentos = dto.intentos
+                     ) ?: dto
+                }
+                contactoRepository.saveAll(contactosToSave)
             }
             // Persistir llamadas
             if (payload.llamadas.isNotEmpty()) {
