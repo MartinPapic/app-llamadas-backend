@@ -11,6 +11,7 @@ import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import com.cem.appllamadasbackend.domain.model.ResultadoLlamada
+import com.cem.appllamadasbackend.domain.model.RolUsuario
 
 data class MetricasResponse(
     val totalContactos: Long,
@@ -72,7 +73,7 @@ class DashboardController(
 
     @GetMapping("/admin/agents")
     fun getAgentes(): ResponseEntity<List<Map<String, String>>> {
-        val agentes = usuarioRepository.findAll().filter { it.rol.lowercase() == "agente" }
+        val agentes = usuarioRepository.findAll().filter { it.rol == RolUsuario.AGENTE }
         val respuesta = agentes.map {
             mapOf(
                 "id" to it.id,

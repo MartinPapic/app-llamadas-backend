@@ -10,5 +10,6 @@ data class Usuario(
     val nombre: String = "",
     val email: String = "",
     val passwordHash: String = "",
-    val rol: String = "agente"  // agente | admin
+    @Enumerated(EnumType.STRING)
+    val rol: RolUsuario = RolUsuario.AGENTE
 )

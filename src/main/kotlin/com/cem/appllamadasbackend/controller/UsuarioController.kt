@@ -1,5 +1,6 @@
 package com.cem.appllamadasbackend.controller
 
+import com.cem.appllamadasbackend.domain.model.RolUsuario
 import com.cem.appllamadasbackend.domain.model.Usuario
 import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
 import org.springframework.http.HttpStatus
@@ -39,13 +40,21 @@ class UsuarioController(
     @GetMapping
     fun obtenerUsuarios(): ResponseEntity<List<UsuarioDTO>> {
         val usuarios = usuarioRepository.findAll().map { 
-            UsuarioDTO(it.id, it.nombre, it.email, it.rol) 
+            UsuarioDTO(it.id, it.nombre, it.email, it.rol.name.lowercase()) 
         }
         return ResponseEntity.ok(usuarios)
     }
 
     @PostMapping
     fun crearUsuario(@RequestBody request: CrearUsuarioRequest): ResponseEntity<*> {
+        val rol = try {
+            RolUsuario.fromString(request.rol)
+        } catch (e: Exception) {
+            return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(mapOf("error" to e.message))
+        }
+
         if (usuarioRepository.findByEmail(request.email).isPresent) {
             return ResponseEntity
                 .status(HttpStatus.CONFLICT)
@@ -57,12 +66,12 @@ class UsuarioController(
             nombre = request.nombre,
             email = request.email,
             passwordHash = passwordEncoder.encode(request.password),
-            rol = request.rol
+            rol = rol
         )
         usuarioRepository.save(usuario)
         
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(UsuarioDTO(usuario.id, usuario.nombre, usuario.email, usuario.rol))
+            .body(UsuarioDTO(usuario.id, usuario.nombre, usuario.email, usuario.rol.name.lowercase()))
     }
 
     @PutMapping("/{id}")
@@ -72,6 +81,14 @@ class UsuarioController(
     ): ResponseEntity<*> {
         val usuario = usuarioRepository.findById(id).orElse(null)
             ?: return ResponseEntity.status(HttpStatus.NOT_FOUND).body(mapOf("error" to "Usuario no encontrado"))
+
+        val rol = try {
+            RolUsuario.fromString(request.rol)
+        } catch (e: Exception) {
+            return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(mapOf("error" to e.message))
+        }
 
         // Verificar email duplicado (si cambió)
         if (request.email != usuario.email && usuarioRepository.findByEmail(request.email).isPresent) {
@@ -89,7 +106,7 @@ class UsuarioController(
         val usuarioActualizado = usuario.copy(
             nombre = request.nombre,
             email = request.email,
-            rol = request.rol,
+            rol = rol,
             passwordHash = passwordHashToSave
         )
         
@@ -100,7 +117,7 @@ class UsuarioController(
                 usuarioActualizado.id, 
                 usuarioActualizado.nombre, 
                 usuarioActualizado.email, 
-                usuarioActualizado.rol
+                usuarioActualizado.rol.name.lowercase()
             )
         )
     }

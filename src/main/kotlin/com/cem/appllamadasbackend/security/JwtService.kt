@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.SignatureAlgorithm
 import io.jsonwebtoken.security.Keys
+import com.cem.appllamadasbackend.domain.model.RolUsuario
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.util.Base64
@@ -20,16 +21,16 @@ class JwtService(
         Keys.hmacShaKeyFor(keyBytes)
     }
 
-    fun generateToken(email: String, rol: String): String =
+    fun generateToken(email: String, rol: RolUsuario): String =
         buildToken(email, rol, expirationMs)
 
-    fun generateRefreshToken(email: String, rol: String): String =
+    fun generateRefreshToken(email: String, rol: RolUsuario): String =
         buildToken(email, rol, refreshExpirationMs)
 
-    private fun buildToken(subject: String, rol: String, expiration: Long): String =
+    private fun buildToken(subject: String, rol: RolUsuario, expiration: Long): String =
         Jwts.builder()
             .setSubject(subject)
-            .claim("rol", rol)
+            .claim("rol", rol.name)
             .setIssuedAt(Date())
             .setExpiration(Date(System.currentTimeMillis() + expiration))
             .signWith(signingKey, SignatureAlgorithm.HS256)

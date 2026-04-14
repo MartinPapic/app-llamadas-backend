@@ -1,5 +1,6 @@
 package com.cem.appllamadasbackend
 
+import com.cem.appllamadasbackend.domain.model.RolUsuario
 import com.cem.appllamadasbackend.domain.model.Usuario
 import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
 import org.springframework.boot.CommandLineRunner
@@ -19,15 +20,16 @@ class DataInitializer(
 ) : CommandLineRunner {
 
     override fun run(vararg args: String?) {
-        val adminEmail = "admin@cem.cl"
+        val adminEmail = System.getenv("ADMIN_SEED_EMAIL") ?: "admin@cem.cl"
+        val adminPassword = System.getenv("ADMIN_SEED_PASSWORD") ?: "REMOVED_SECRET"
 
         if (usuarioRepository.findByEmail(adminEmail).isEmpty) {
             val admin = Usuario(
                 id = UUID.randomUUID().toString(),
                 nombre = "Administrador CEM",
                 email = adminEmail,
-                passwordHash = passwordEncoder.encode("REMOVED_SECRET"),
-                rol = "admin"  // JwtFilter lo convierte a ROLE_ADMIN
+                passwordHash = passwordEncoder.encode(adminPassword),
+                rol = RolUsuario.ADMIN  // JwtFilter lo convierte a ROLE_ADMIN
             )
             usuarioRepository.save(admin)
             println("✅ [DataInitializer] Usuario admin creado: $adminEmail")
