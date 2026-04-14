@@ -4,7 +4,7 @@ spring:
   datasource:
     url: jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5432}/${PGDATABASE:app_llamadas}
     username: ${PGUSER:postgres}
-    password: ${PGPASSWORD:password}
+    password: ${PGPASSWORD}
   jpa:
     hibernate:
       ddl-auto: update
@@ -24,6 +24,6 @@ management:
       show-details: never
 
 jwt:
-  secret: ${JWT_SECRET:REMOVED_SECRET}
+  secret: ${JWT_SECRET}
   expiration-ms: 28800000   # 8 horas
   refresh-expiration-ms: 604800000  # 7 días
