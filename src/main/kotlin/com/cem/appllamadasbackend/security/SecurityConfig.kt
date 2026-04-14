@@ -24,15 +24,13 @@ class SecurityConfig(private val jwtFilter: JwtFilter) {
                 auth
                     .requestMatchers("/auth/**").permitAll()
                     .requestMatchers("/actuator/health").permitAll()
-                    // Rutas de lectura del dashboard — solo requieren JWT válido (cualquier rol)
-                    .requestMatchers(org.springframework.http.HttpMethod.GET, "/metrics").authenticated()
-                    .requestMatchers(org.springframework.http.HttpMethod.GET, "/admin/**").authenticated()
-                    .requestMatchers(org.springframework.http.HttpMethod.GET, "/analytics/**").authenticated()
-                    // Escritura: solo administradores
-                    .requestMatchers(org.springframework.http.HttpMethod.POST, "/admin/**").hasRole("ADMIN")
-                    .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/admin/**").hasRole("ADMIN")
+                    // Rutas de agente (App Móvil)
+                    .requestMatchers("/contacts/**", "/contactos/**", "/calls", "/sync", "/encuestas").hasRole("AGENTE")
+                    // Rutas del dashboard (solo ADMIN)
+                    .requestMatchers("/metrics").hasRole("ADMIN")
+                    .requestMatchers("/admin/**").hasRole("ADMIN")
+                    .requestMatchers("/analytics/**").hasRole("ADMIN")
                     .requestMatchers("/usuarios/**").hasRole("ADMIN")
-                    // el resto requiere autenticación
                     .anyRequest().authenticated()
             }
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter::class.java)
