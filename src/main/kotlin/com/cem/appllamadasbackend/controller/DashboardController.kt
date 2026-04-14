@@ -10,6 +10,7 @@ import com.cem.appllamadasbackend.domain.model.Usuario
 import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import com.cem.appllamadasbackend.domain.model.ResultadoLlamada
 
 data class MetricasResponse(
     val totalContactos: Long,
@@ -34,8 +35,8 @@ class DashboardController(
         val totalContactos = contactoRepository.count()
         val todasLlamadas  = llamadaRepository.findAll()
         val totalLlamadas  = todasLlamadas.size.toLong()
-        val contestan      = todasLlamadas.count { it.resultado == "CONTESTA" }.toLong()
-        val noContestan    = todasLlamadas.count { it.resultado == "NO_CONTESTA" }.toLong()
+        val contestan      = todasLlamadas.count { it.resultado == ResultadoLlamada.CONTESTA }.toLong()
+        val noContestan    = todasLlamadas.count { it.resultado == ResultadoLlamada.NO_CONTESTA }.toLong()
         val durPromedio    = todasLlamadas.mapNotNull { it.duracion }.let {
             if (it.isEmpty()) 0.0 else it.average()
         }

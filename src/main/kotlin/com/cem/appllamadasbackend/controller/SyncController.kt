@@ -150,7 +150,7 @@ class SyncController(
 
         val todos = contactoRepository.findAll().filter { it.agenteId == usuario.id || it.agenteId == usuario.email }
         val resultado = if (estado != null) {
-            todos.filter { it.estado.equals(estado, ignoreCase = true) }
+            todos.filter { it.estado.name.equals(estado, ignoreCase = true) }
         } else {
             todos
         }
@@ -172,7 +172,7 @@ class SyncController(
             ?: return ResponseEntity.status(401).build()
 
         val pendientes = contactoRepository.findAll().filter {
-            (it.agenteId == usuario.id || it.agenteId == usuario.email) && it.estado != "desistido" && it.estado != "contactado"
+            (it.agenteId == usuario.id || it.agenteId == usuario.email) && it.estado != EstadoContacto.DESISTIDO && it.estado != EstadoContacto.CONTACTADO
         }
         return ResponseEntity.ok(pendientes)
     }
