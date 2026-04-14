@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.web.bind.annotation.*
+import com.cem.appllamadasbackend.domain.repository.EncuestaRepository
 import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
 
 @RestController
@@ -15,7 +16,8 @@ import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
 class SyncController(
     private val contactoRepository: ContactoRepository,
     private val llamadaRepository: LlamadaRepository,
-    private val usuarioRepository: UsuarioRepository
+    private val usuarioRepository: UsuarioRepository,
+    private val encuestaRepository: EncuestaRepository
 ) {
 
     // ─── DTOs ─────────────────────────────────────────────────────────────────
@@ -29,6 +31,18 @@ class SyncController(
         val success: Boolean,
         val message: String,
         val synchronizedIds: List<String>
+    )
+
+    data class EncuestaDto(
+        val id: String,
+        val contactoId: String,
+        val url: String,
+        val estado: String,
+        val fecha: Long
+    )
+
+    data class EncuestaSyncRequest(
+        val encuestas: List<EncuestaDto>
     )
 
     // ─── POST /api/calls — registrar llamada individual ────────────────────────
@@ -70,6 +84,22 @@ class SyncController(
             ResponseEntity.internalServerError()
                 .body(SyncResponse(false, e.message ?: "Error de sincronización", emptyList()))
         }
+    }
+
+    // ─── POST /api/encuestas — guarda encuesta individual o batch ──────────────
+    @PostMapping("/encuestas")
+    fun saveEncuestas(@RequestBody request: EncuestaSyncRequest): ResponseEntity<Map<String, String>> {
+        val entidades = request.encuestas.map { dto ->
+            com.cem.appllamadasbackend.domain.model.Encuesta(
+                id = dto.id,
+                contactoId = dto.contactoId,
+                url = dto.url,
+                estado = dto.estado,
+                fecha = dto.fecha
+            )
+        }
+        encuestaRepository.saveAll(entidades)
+        return ResponseEntity.ok(mapOf("mensaje" to "${entidades.size} encuestas sincronizadas"))
     }
 
     // ─── GET /api/contactos — lista de contactos (con filtro opcional) ─────────
