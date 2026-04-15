@@ -19,5 +19,6 @@ data class Llamada(
     @Enumerated(EnumType.STRING)
     val resultado: ResultadoLlamada? = null,
     val tipificacion: String? = null,
+    val motivo: String? = null,
     val observacion: String? = null
 )

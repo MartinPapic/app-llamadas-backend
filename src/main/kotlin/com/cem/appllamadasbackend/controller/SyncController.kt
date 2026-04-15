@@ -82,7 +82,7 @@ class SyncController(
                     val contactoOpt = contactoRepository.findById(contactoId)
                     if (contactoOpt.isPresent) {
                         val contacto = contactoOpt.get()
-                        val huboExito = llamadas.any { it.resultado == ResultadoLlamada.CONTESTA }
+                        val huboExito = llamadas.any { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO }
                         
                         if (huboExito) {
                             contacto.estado = EstadoContacto.CONTACTADO

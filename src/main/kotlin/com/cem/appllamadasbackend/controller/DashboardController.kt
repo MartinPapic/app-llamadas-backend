@@ -36,12 +36,13 @@ class DashboardController(
         val totalContactos = contactoRepository.count()
         val todasLlamadas  = llamadaRepository.findAll()
         val totalLlamadas  = todasLlamadas.size.toLong()
-        val contestan      = todasLlamadas.count { it.resultado == ResultadoLlamada.CONTESTA }.toLong()
-        val noContestan    = todasLlamadas.count { it.resultado == ResultadoLlamada.NO_CONTESTA }.toLong()
+        val contestan      = todasLlamadas.count { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO || it.resultado == ResultadoLlamada.CONTACTADO_NO_EFECTIVO }.toLong()
+        val noContestan    = todasLlamadas.count { it.resultado == ResultadoLlamada.NO_CONTACTADO }.toLong()
         val durPromedio    = todasLlamadas.mapNotNull { it.duracion }.let {
             if (it.isEmpty()) 0.0 else it.average()
         }
-        val tasa = if (totalLlamadas > 0) (contestan.toDouble() / totalLlamadas) * 100 else 0.0
+        val contestanEfectivos = todasLlamadas.count { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO }.toDouble()
+        val tasa = if (totalLlamadas > 0) (contestanEfectivos / totalLlamadas) * 100 else 0.0
 
         return ResponseEntity.ok(MetricasResponse(
             totalContactos  = totalContactos,
