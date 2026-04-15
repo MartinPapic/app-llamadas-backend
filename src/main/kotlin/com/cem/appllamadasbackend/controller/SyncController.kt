@@ -102,10 +102,11 @@ class SyncController(
                     if (contactoOpt.isPresent) {
                         val contacto = contactoOpt.get()
                         val huboExito = llamadas.any { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO }
+                        val huboRechazoExplícito = llamadas.any { it.tipificacion == "RECHAZO_EXPLICITO" }
                         
                         if (huboExito) {
                             contacto.estado = EstadoContacto.CONTACTADO
-                        } else if (contacto.intentos >= 5) {
+                        } else if (huboRechazoExplícito || contacto.intentos >= 5) {
                             contacto.estado = EstadoContacto.DESISTIDO
                         } else if (contacto.estado == EstadoContacto.PENDIENTE) {
                             contacto.estado = EstadoContacto.EN_GESTION
