@@ -17,5 +17,7 @@ data class Contacto(
     var estado: EstadoContacto = EstadoContacto.PENDIENTE,
     var intentos: Int = 0,
     val fechaCreacion: Long = 0L,
-    val agenteId: String? = null
+    var agenteId: String? = null,
+    var bloqueadoPor: String? = null,
+    var fechaBloqueo: Long? = null
 )

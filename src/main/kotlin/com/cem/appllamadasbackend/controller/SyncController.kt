@@ -48,20 +48,39 @@ class SyncController(
         val encuestas: List<EncuestaDto>
     )
 
-    // ─── POST /api/calls — registrar llamada individual ────────────────────────
-    @PostMapping("/calls")
-    fun registrarLlamada(
-        @RequestBody llamada: Llamada,
+    // ─── POST /api/contacts/{id}/lock — Bloqueo preventivo pro-Pool ─────────────
+    @PostMapping("/contacts/{id}/lock")
+    @Transactional
+    fun lockContacto(
+        @PathVariable id: String,
         @AuthenticationPrincipal email: String
     ): ResponseEntity<Map<String, Any>> {
-        return try {
-            val saved = llamadaRepository.save(llamada)
-            ResponseEntity.ok(mapOf("id" to saved.id, "message" to "Llamada registrada"))
-        } catch (e: Exception) {
-            e.printStackTrace()
-            ResponseEntity.internalServerError()
-                .body(mapOf("error" to (e.message ?: "Error al registrar llamada")))
+        val usuario = usuarioRepository.findByEmail(email).orElse(null)
+            ?: return ResponseEntity.status(401).build()
+
+        val contactoOpt = contactoRepository.findById(id)
+        if (!contactoOpt.isPresent) return ResponseEntity.notFound().build()
+        val contacto = contactoOpt.get()
+
+        val ahora = System.currentTimeMillis()
+        val diezMinutos = 10 * 60 * 1000
+
+        // Verificar si está bloqueado por otro con tiempo vigente
+        val bloqueadoPorOtro = contacto.bloqueadoPor != null && 
+                              contacto.bloqueadoPor != usuario.id && 
+                              contacto.bloqueadoPor != usuario.email &&
+                              (ahora - (contacto.fechaBloqueo ?: 0L)) < diezMinutos
+
+        if (bloqueadoPorOtro) {
+             return ResponseEntity.status(409).body(mapOf("error" to "Contacto ocupado por otro agente"))
         }
+
+        // Adquirir bloqueo
+        contacto.bloqueadoPor = usuario.id
+        contacto.fechaBloqueo = ahora
+        contactoRepository.save(contacto)
+
+        return ResponseEntity.ok(mapOf("success" to true, "expiresIn" to diezMinutos))
     }
 
     @PostMapping("/sync")
@@ -92,7 +111,10 @@ class SyncController(
                             contacto.estado = EstadoContacto.EN_GESTION
                         }
 
-                        // Actualizar la fecha de última modificación o re-guardar
+                        // Liberar bloqueo tras sync exitoso
+                        contacto.bloqueadoPor = null
+                        contacto.fechaBloqueo = null
+                        
                         contactoRepository.save(contacto)
                     }
                 }
@@ -148,7 +170,17 @@ class SyncController(
         val usuario = usuarioRepository.findByEmail(email).orElse(null)
             ?: return ResponseEntity.status(401).build()
 
-        val todos = contactoRepository.findAll().filter { it.agenteId == usuario.id || it.agenteId == usuario.email }
+        val ahora = System.currentTimeMillis()
+        val diezMinutos = 10 * 60 * 1000
+
+        val todos = contactoRepository.findAll().filter { contacto ->
+            val bloqueadoPorOtro = contacto.bloqueadoPor != null && 
+                                  contacto.bloqueadoPor != usuario.id && 
+                                  contacto.bloqueadoPor != usuario.email &&
+                                  (ahora - (contacto.fechaBloqueo ?: 0L)) < diezMinutos
+            !bloqueadoPorOtro
+        }
+        
         val resultado = if (estado != null) {
             todos.filter { it.estado.name.equals(estado, ignoreCase = true) }
         } else {
@@ -171,8 +203,18 @@ class SyncController(
         val usuario = usuarioRepository.findByEmail(email).orElse(null)
             ?: return ResponseEntity.status(401).build()
 
-        val pendientes = contactoRepository.findAll().filter {
-            (it.agenteId == usuario.id || it.agenteId == usuario.email) && it.estado != EstadoContacto.DESISTIDO && it.estado != EstadoContacto.CONTACTADO
+        val ahora = System.currentTimeMillis()
+        val diezMinutos = 10 * 60 * 1000
+
+        val pendientes = contactoRepository.findAll().filter { contacto ->
+            val bloqueadoPorOtro = contacto.bloqueadoPor != null && 
+                                  contacto.bloqueadoPor != usuario.id && 
+                                  contacto.bloqueadoPor != usuario.email &&
+                                  (ahora - (contacto.fechaBloqueo ?: 0L)) < diezMinutos
+                                  
+            contacto.estado != EstadoContacto.DESISTIDO && 
+            contacto.estado != EstadoContacto.CONTACTADO &&
+            !bloqueadoPorOtro
         }
         return ResponseEntity.ok(pendientes)
     }
