@@ -32,9 +32,13 @@ class DashboardController(
 ) {
 
     @GetMapping("/metrics")
-    fun getMetricas(): ResponseEntity<MetricasResponse> {
-        val totalContactos = contactoRepository.count()
-        val todasLlamadas  = llamadaRepository.findAll()
+    fun getMetricas(@RequestParam(required = false) proyectoId: String?): ResponseEntity<MetricasResponse> {
+        val totalContactos = if (proyectoId != null) contactoRepository.findAll().count { it.proyectoId == proyectoId }.toLong() 
+                            else contactoRepository.count()
+        
+        val todasLlamadas  = if (proyectoId != null) llamadaRepository.findAll().filter { it.proyectoId == proyectoId }
+                            else llamadaRepository.findAll()
+                            
         val totalLlamadas  = todasLlamadas.size.toLong()
         val contestan      = todasLlamadas.count { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO || it.resultado == ResultadoLlamada.CONTACTADO_NO_EFECTIVO }.toLong()
         val noContestan    = todasLlamadas.count { it.resultado == ResultadoLlamada.NO_CONTACTADO }.toLong()
@@ -67,8 +71,16 @@ class DashboardController(
         ResponseEntity.ok(contactoRepository.save(contacto))
 
     @PostMapping("/admin/contacts/upload")
-    fun uploadContactos(@RequestBody contactos: List<Contacto>): ResponseEntity<Map<String, Any>> {
-        val saved = contactoRepository.saveAll(contactos)
+    fun uploadContactos(
+        @RequestBody contactos: List<Contacto>,
+        @RequestParam(required = false) proyectoId: String?
+    ): ResponseEntity<Map<String, Any>> {
+        val contactosAProcesar = if (proyectoId != null) {
+            contactos.map { it.copy(proyectoId = proyectoId) }
+        } else {
+            contactos
+        }
+        val saved = contactoRepository.saveAll(contactosAProcesar)
         return ResponseEntity.ok(mapOf("mensaje" to "Contactos importados exitosamente", "cantidad" to saved.size))
     }
 

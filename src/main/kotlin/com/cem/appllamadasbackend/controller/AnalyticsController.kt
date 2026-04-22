@@ -51,4 +51,27 @@ class AnalyticsController(
 
         return ResponseEntity.ok(response)
     }
+
+    @GetMapping("/agents")
+    fun getAgentStats(): ResponseEntity<List<Map<String, Any>>> {
+        val llamadas = llamadaRepository.findAll()
+        val stats = llamadas.groupBy { it.usuarioId }.map { (usuarioId, calls) ->
+            val total = calls.size
+            val efectivos = calls.count { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO }
+            val noEfectivos = calls.count { it.resultado == ResultadoLlamada.CONTACTADO_NO_EFECTIVO }
+            val noContestan = calls.count { it.resultado == ResultadoLlamada.NO_CONTACTADO }
+            val duracionAvg = if (total > 0) calls.mapNotNull { it.duracion }.average() else 0.0
+            
+            mapOf(
+                "agenteId" to usuarioId,
+                "totalLlamadas" to total,
+                "efectivos" to efectivos,
+                "noEfectivos" to noEfectivos,
+                "noContestan" to noContestan,
+                "duracionPromedio" to duracionAvg,
+                "tasaEfectividad" to if (total > 0) (efectivos.toDouble() / total) * 100 else 0.0
+            )
+        }
+        return ResponseEntity.ok(stats)
+    }
 }

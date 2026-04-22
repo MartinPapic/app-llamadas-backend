@@ -97,19 +97,41 @@ class SyncController(
 
             // 2. Control Server-Side de estados (Authoritative State)
             if (payload.llamadas.isNotEmpty()) {
-                payload.llamadas.groupBy { it.contactoId }.forEach { (contactoId, llamadas) ->
+                payload.llamadas.groupBy { it.contactoId }.forEach { (contactoId, llamadasDelContacto) ->
                     val contactoOpt = contactoRepository.findById(contactoId)
                     if (contactoOpt.isPresent) {
                         val contacto = contactoOpt.get()
-                        val huboExito = llamadas.any { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO }
-                        val huboRechazoExplícito = llamadas.any { it.tipificacion == "RECHAZO_EXPLICITO" }
+                        
+                        // Encontrar la última llamada (por fecha o simplemente la última del batch)
+                        val ultimaLlamada = llamadasDelContacto.maxByOrNull { it.fechaInicio }
+                        
+                        val huboExito = llamadasDelContacto.any { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO }
+                        
+                        // Lista de tipificaciones que cierran el caso
+                        val tipificacionesCierre = listOf(
+                            "NUMERO_NO_CORRESPONDE", 
+                            "NUMERO_NO_EXISTE", 
+                            "DESISTIO_PROYECTO",
+                            "RECHAZO_EXPLICITO",
+                            "NO_CONTACTAR_NUEVAMENTE"
+                        )
+                        
+                        val huboCierreForzado = llamadasDelContacto.any { 
+                            it.tipificacion != null && tipificacionesCierre.contains(it.tipificacion.uppercase()) 
+                        }
                         
                         if (huboExito) {
                             contacto.estado = EstadoContacto.CONTACTADO
-                        } else if (huboRechazoExplícito || contacto.intentos >= 5) {
+                        } else if (huboCierreForzado || contacto.intentos >= 5) {
                             contacto.estado = EstadoContacto.DESISTIDO
                         } else if (contacto.estado == EstadoContacto.PENDIENTE) {
                             contacto.estado = EstadoContacto.EN_GESTION
+                        }
+
+                        // Actualizar info de última gestión
+                        if (ultimaLlamada != null) {
+                            contacto.ultimaTipificacion = ultimaLlamada.tipificacion
+                            contacto.ultimaObservacion = ultimaLlamada.observacion
                         }
 
                         // Liberar bloqueo tras sync exitoso
