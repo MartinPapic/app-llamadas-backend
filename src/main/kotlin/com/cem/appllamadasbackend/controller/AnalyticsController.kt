@@ -2,6 +2,7 @@ package com.cem.appllamadasbackend.controller
 
 import com.cem.appllamadasbackend.domain.repository.ContactoRepository
 import com.cem.appllamadasbackend.domain.repository.LlamadaRepository
+import com.cem.appllamadasbackend.domain.model.ResultadoLlamada
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
