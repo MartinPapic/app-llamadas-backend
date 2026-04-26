@@ -2,7 +2,9 @@ package com.cem.appllamadasbackend
 
 import com.cem.appllamadasbackend.domain.model.RolUsuario
 import com.cem.appllamadasbackend.domain.model.Usuario
+import com.cem.appllamadasbackend.domain.model.Tipificacion
 import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
+import com.cem.appllamadasbackend.domain.repository.TipificacionRepository
 import org.springframework.boot.CommandLineRunner
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Component
@@ -18,6 +20,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 @Component
 class DataInitializer(
     private val usuarioRepository: UsuarioRepository,
+    private val tipificacionRepository: TipificacionRepository,
     private val passwordEncoder: PasswordEncoder,
     private val jdbcTemplate: JdbcTemplate
 ) : CommandLineRunner {
@@ -57,6 +60,25 @@ class DataInitializer(
             )
             usuarioRepository.save(admin)
             println("✅ [DataInitializer] Usuario admin creado: $adminEmail")
+        }
+
+        // --- Seeding de Tipificaciones ---
+        if (tipificacionRepository.count() == 0L) {
+            val tipificaciones = listOf(
+                Tipificacion(UUID.randomUUID().toString(), "Contactado", "CONTACTADO_EFECTIVO", false),
+                Tipificacion(UUID.randomUUID().toString(), "Enviar Mail", "CONTACTADO_EFECTIVO", false),
+                Tipificacion(UUID.randomUUID().toString(), "Llamar más tarde", "CONTACTADO_NO_EFECTIVO", false),
+                Tipificacion(UUID.randomUUID().toString(), "No quiere participar", "CONTACTADO_NO_EFECTIVO", true),
+                Tipificacion(UUID.randomUUID().toString(), "Desistió del proyecto/programa", "CONTACTADO_NO_EFECTIVO", true),
+                Tipificacion(UUID.randomUUID().toString(), "Desconfianza de la encuesta telefónica", "CONTACTADO_NO_EFECTIVO", true),
+                Tipificacion(UUID.randomUUID().toString(), "No contesta", "NO_CONTACTADO", false),
+                Tipificacion(UUID.randomUUID().toString(), "Fuera de Servicio", "NO_CONTACTADO", false),
+                Tipificacion(UUID.randomUUID().toString(), "Teléfono Apagado", "NO_CONTACTADO", false),
+                Tipificacion(UUID.randomUUID().toString(), "Número no corresponde", "NO_CONTACTADO", true),
+                Tipificacion(UUID.randomUUID().toString(), "Número no existe", "NO_CONTACTADO", true)
+            )
+            tipificacionRepository.saveAll(tipificaciones)
+            println("✅ [DataInitializer] Tipificaciones inicializadas")
         }
     }
 }

@@ -4,8 +4,6 @@ import com.cem.appllamadasbackend.domain.model.Contacto
 import com.cem.appllamadasbackend.domain.model.Llamada
 import com.cem.appllamadasbackend.domain.repository.ContactoRepository
 import com.cem.appllamadasbackend.domain.repository.LlamadaRepository
-import com.cem.appllamadasbackend.domain.model.Encuesta
-import com.cem.appllamadasbackend.domain.repository.EncuestaRepository
 import com.cem.appllamadasbackend.domain.model.Usuario
 import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
 import org.springframework.http.ResponseEntity
@@ -27,36 +25,10 @@ data class MetricasResponse(
 class DashboardController(
     private val contactoRepository: ContactoRepository,
     private val llamadaRepository: LlamadaRepository,
-    private val usuarioRepository: UsuarioRepository,
-    private val encuestaRepository: EncuestaRepository
+    private val usuarioRepository: UsuarioRepository
 ) {
 
-    @GetMapping("/metrics")
-    fun getMetricas(@RequestParam(required = false) proyectoId: String?): ResponseEntity<MetricasResponse> {
-        val totalContactos = if (proyectoId != null) contactoRepository.findAll().count { it.proyectoId == proyectoId }.toLong() 
-                            else contactoRepository.count()
-        
-        val todasLlamadas  = if (proyectoId != null) llamadaRepository.findAll().filter { it.proyectoId == proyectoId }
-                            else llamadaRepository.findAll()
-                            
-        val totalLlamadas  = todasLlamadas.size.toLong()
-        val contestan      = todasLlamadas.count { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO || it.resultado == ResultadoLlamada.CONTACTADO_NO_EFECTIVO }.toLong()
-        val noContestan    = todasLlamadas.count { it.resultado == ResultadoLlamada.NO_CONTACTADO }.toLong()
-        val durPromedio    = todasLlamadas.mapNotNull { it.duracion }.let {
-            if (it.isEmpty()) 0.0 else it.average()
-        }
-        val contestanEfectivos = todasLlamadas.count { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO }.toDouble()
-        val tasa = if (totalLlamadas > 0) (contestanEfectivos / totalLlamadas) * 100 else 0.0
 
-        return ResponseEntity.ok(MetricasResponse(
-            totalContactos  = totalContactos,
-            totalLlamadas   = totalLlamadas,
-            totalContestan  = contestan,
-            totalNoContestan = noContestan,
-            duracionPromedio = durPromedio,
-            tasaContacto    = tasa
-        ))
-    }
 
     @GetMapping("/admin/calls")
     fun getLlamadas(): ResponseEntity<List<Llamada>> =
@@ -98,7 +70,4 @@ class DashboardController(
         return ResponseEntity.ok(respuesta)
     }
 
-    @GetMapping("/admin/surveys")
-    fun getEncuestas(): ResponseEntity<List<Encuesta>> =
-        ResponseEntity.ok(encuestaRepository.findAll())
 }

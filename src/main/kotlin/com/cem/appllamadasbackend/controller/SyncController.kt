@@ -11,8 +11,8 @@ import com.cem.appllamadasbackend.domain.model.ResultadoLlamada
 import com.cem.appllamadasbackend.domain.model.EstadoContacto
 
 import org.springframework.web.bind.annotation.*
-import com.cem.appllamadasbackend.domain.repository.EncuestaRepository
 import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
+import com.cem.appllamadasbackend.domain.repository.TipificacionRepository
 
 @RestController
 @RequestMapping("/")
@@ -20,7 +20,7 @@ class SyncController(
     private val contactoRepository: ContactoRepository,
     private val llamadaRepository: LlamadaRepository,
     private val usuarioRepository: UsuarioRepository,
-    private val encuestaRepository: EncuestaRepository
+    private val tipificacionRepository: TipificacionRepository
 ) {
 
     // ─── DTOs ─────────────────────────────────────────────────────────────────
@@ -34,18 +34,6 @@ class SyncController(
         val success: Boolean,
         val message: String,
         val synchronizedIds: List<String>
-    )
-
-    data class EncuestaDto(
-        val id: String,
-        val contactoId: String,
-        val url: String,
-        val estado: String,
-        val fecha: Long
-    )
-
-    data class EncuestaSyncRequest(
-        val encuestas: List<EncuestaDto>
     )
 
     // ─── POST /api/contacts/{id}/lock — Bloqueo preventivo pro-Pool ─────────────
@@ -108,13 +96,9 @@ class SyncController(
                         val huboExito = llamadasDelContacto.any { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO }
                         
                         // Lista de tipificaciones que cierran el caso
-                        val tipificacionesCierre = listOf(
-                            "NUMERO_NO_CORRESPONDE", 
-                            "NUMERO_NO_EXISTE", 
-                            "DESISTIO_PROYECTO",
-                            "RECHAZO_EXPLICITO",
-                            "NO_CONTACTAR_NUEVAMENTE"
-                        )
+                        val tipificacionesCierre = tipificacionRepository.findAll()
+                            .filter { it.cierraCaso }
+                            .map { it.nombre.uppercase() }
                         
                         val huboCierreForzado = llamadasDelContacto.any { 
                             it.tipificacion != null && tipificacionesCierre.contains(it.tipificacion.uppercase()) 
@@ -168,20 +152,19 @@ class SyncController(
         }
     }
 
-    // ─── POST /api/encuestas — guarda encuesta individual o batch ──────────────
-    @PostMapping("/encuestas")
-    fun saveEncuestas(@RequestBody request: EncuestaSyncRequest): ResponseEntity<Map<String, String>> {
-        val entidades = request.encuestas.map { dto ->
-            com.cem.appllamadasbackend.domain.model.Encuesta(
-                id = dto.id,
-                contactoId = dto.contactoId,
-                url = dto.url,
-                estado = dto.estado,
-                fecha = dto.fecha
-            )
+    // ─── POST /calls — registra una llamada individual (Sync Inmediato) ────────
+    @PostMapping("/calls")
+    fun registrarLlamada(@RequestBody llamada: Llamada, @AuthenticationPrincipal email: String): ResponseEntity<Map<String, String>> {
+        val payload = SyncPayload(
+            llamadas = listOf(llamada),
+            contactosActualizados = emptyList()
+        )
+        val response = syncData(payload, email)
+        return if (response.statusCode.is2xxSuccessful) {
+            ResponseEntity.ok(mapOf("mensaje" to "Llamada registrada exitosamente"))
+        } else {
+            ResponseEntity.status(response.statusCode).body(mapOf("error" to "Error al registrar llamada"))
         }
-        encuestaRepository.saveAll(entidades)
-        return ResponseEntity.ok(mapOf("mensaje" to "${entidades.size} encuestas sincronizadas"))
     }
 
     // ─── GET /contacts — lista de contactos (con filtro opcional) ─────────

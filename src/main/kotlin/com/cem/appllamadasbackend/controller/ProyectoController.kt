@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*
 import java.util.UUID
 
 @RestController
-@RequestMapping("/api/proyectos")
+@RequestMapping("/projects")
 class ProyectoController(
     private val proyectoRepository: ProyectoRepository,
     private val usuarioProyectoRepository: UsuarioProyectoRepository,

@@ -11,12 +11,48 @@ import org.springframework.web.bind.annotation.RestController
 import java.time.LocalDate
 import java.time.ZoneId
 
+data class MetricasResponse(
+    val totalContactos: Long,
+    val totalLlamadas: Long,
+    val totalContestan: Long,
+    val totalNoContestan: Long,
+    val duracionPromedio: Double,
+    val tasaContacto: Double
+)
+
 @RestController
-@RequestMapping("/analytics")
+@RequestMapping("/metrics")
 class AnalyticsController(
     private val contactoRepository: ContactoRepository,
     private val llamadaRepository: LlamadaRepository
 ) {
+
+    @GetMapping
+    fun getMetricas(@RequestParam(required = false) proyectoId: String?): ResponseEntity<MetricasResponse> {
+        val totalContactos = if (proyectoId != null) contactoRepository.findAll().count { it.proyectoId == proyectoId }.toLong() 
+                            else contactoRepository.count()
+        
+        val todasLlamadas  = if (proyectoId != null) llamadaRepository.findAll().filter { it.proyectoId == proyectoId }
+                            else llamadaRepository.findAll()
+                            
+        val totalLlamadas  = todasLlamadas.size.toLong()
+        val contestan      = todasLlamadas.count { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO || it.resultado == ResultadoLlamada.CONTACTADO_NO_EFECTIVO }.toLong()
+        val noContestan    = todasLlamadas.count { it.resultado == ResultadoLlamada.NO_CONTACTADO }.toLong()
+        val durPromedio    = todasLlamadas.mapNotNull { it.duracion }.let {
+            if (it.isEmpty()) 0.0 else it.average()
+        }
+        val contestanEfectivos = todasLlamadas.count { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO }.toDouble()
+        val tasa = if (totalLlamadas > 0) (contestanEfectivos / totalLlamadas) * 100 else 0.0
+
+        return ResponseEntity.ok(MetricasResponse(
+            totalContactos  = totalContactos,
+            totalLlamadas   = totalLlamadas,
+            totalContestan  = contestan,
+            totalNoContestan = noContestan,
+            duracionPromedio = durPromedio,
+            tasaContacto    = tasa
+        ))
+    }
 
     @GetMapping("/realtime")
     fun getRealtimeMetrics(@RequestParam(required = false) fecha: String?): ResponseEntity<Map<String, Any>> {
