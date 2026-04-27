@@ -11,14 +11,7 @@ import org.springframework.web.bind.annotation.*
 import com.cem.appllamadasbackend.domain.model.ResultadoLlamada
 import com.cem.appllamadasbackend.domain.model.RolUsuario
 
-data class MetricasResponse(
-    val totalContactos: Long,
-    val totalLlamadas: Long,
-    val totalContestan: Long,
-    val totalNoContestan: Long,
-    val duracionPromedio: Double,
-    val tasaContacto: Double
-)
+
 
 @RestController
 @RequestMapping("/")
