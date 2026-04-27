@@ -171,6 +171,7 @@ class SyncController(
     @GetMapping("/contacts")
     fun getContactos(
         @RequestParam(required = false) estado: String?,
+        @RequestParam(required = false) proyectoId: String?,
         @AuthenticationPrincipal email: String
     ): ResponseEntity<List<Contacto>> {
         val usuario = usuarioRepository.findByEmail(email).orElse(null)
@@ -187,11 +188,10 @@ class SyncController(
             !bloqueadoPorOtro
         }
         
-        val resultado = if (estado != null) {
-            todos.filter { it.estado.name.equals(estado, ignoreCase = true) }
-        } else {
-            todos
-        }
+        val resultado = todos
+            .let { if (proyectoId != null) it.filter { c -> c.proyectoId == proyectoId } else it }
+            .let { if (estado != null) it.filter { c -> c.estado.name.equals(estado, ignoreCase = true) } else it }
+
         return ResponseEntity.ok(resultado)
     }
 
