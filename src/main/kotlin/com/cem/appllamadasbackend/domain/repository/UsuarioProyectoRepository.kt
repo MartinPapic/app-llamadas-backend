@@ -7,4 +7,5 @@ import org.springframework.stereotype.Repository
 @Repository
 interface UsuarioProyectoRepository : JpaRepository<UsuarioProyecto, Long> {
     fun findAllByUsuarioId(usuarioId: String): List<UsuarioProyecto>
+    fun findAllByProyectoId(proyectoId: String): List<UsuarioProyecto>
 }

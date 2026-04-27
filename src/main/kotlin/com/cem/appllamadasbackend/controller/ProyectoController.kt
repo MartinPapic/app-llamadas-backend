@@ -51,4 +51,26 @@ class ProyectoController(
     fun asignarAgente(@RequestBody asignacion: UsuarioProyecto): ResponseEntity<UsuarioProyecto> {
         return ResponseEntity.ok(usuarioProyectoRepository.save(asignacion))
     }
+
+    @GetMapping("/{proyectoId}/agentes")
+    fun agentesDeProyecto(@PathVariable proyectoId: String): ResponseEntity<List<Map<String, Any>>> {
+        val asignaciones = usuarioProyectoRepository.findAllByProyectoId(proyectoId)
+        val resultado = asignaciones.mapNotNull { asig ->
+            usuarioRepository.findById(asig.usuarioId).orElse(null)?.let { u ->
+                mapOf(
+                    "asignacionId" to (asig.id ?: 0L),
+                    "id" to u.id,
+                    "nombre" to u.nombre,
+                    "email" to u.email
+                )
+            }
+        }
+        return ResponseEntity.ok(resultado)
+    }
+
+    @DeleteMapping("/asignaciones/{id}")
+    fun desasignarAgente(@PathVariable id: Long): ResponseEntity<Void> {
+        usuarioProyectoRepository.deleteById(id)
+        return ResponseEntity.noContent().build()
+    }
 }
