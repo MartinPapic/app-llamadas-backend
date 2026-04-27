@@ -21,13 +21,13 @@ data class MetricasResponse(
 )
 
 @RestController
-@RequestMapping("/metrics")
+@RequestMapping
 class AnalyticsController(
     private val contactoRepository: ContactoRepository,
     private val llamadaRepository: LlamadaRepository
 ) {
 
-    @GetMapping
+    @GetMapping("/metrics")
     fun getMetricas(@RequestParam(required = false) proyectoId: String?): ResponseEntity<MetricasResponse> {
         val totalContactos = if (proyectoId != null) contactoRepository.findAll().count { it.proyectoId == proyectoId }.toLong() 
                             else contactoRepository.count()
@@ -54,7 +54,7 @@ class AnalyticsController(
         ))
     }
 
-    @GetMapping("/realtime")
+    @GetMapping("/analytics/realtime")
     fun getRealtimeMetrics(@RequestParam(required = false) fecha: String?): ResponseEntity<Map<String, Any>> {
         val date = fecha?.let { try { LocalDate.parse(it) } catch (e: Exception) { LocalDate.now() } } ?: LocalDate.now()
         val startOfDay = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
@@ -75,7 +75,7 @@ class AnalyticsController(
         return ResponseEntity.ok(response)
     }
 
-    @GetMapping("/funnel")
+    @GetMapping("/analytics/funnel")
     fun getFunnel(): ResponseEntity<Map<String, Any>> {
         val totalBase = contactoRepository.count()
         val distribucionDb = contactoRepository.countByEstado()
@@ -89,7 +89,7 @@ class AnalyticsController(
         return ResponseEntity.ok(response)
     }
 
-    @GetMapping("/agents")
+    @GetMapping("/analytics/agents")
     fun getAgentStats(): ResponseEntity<List<Map<String, Any>>> {
         val llamadas = llamadaRepository.findAll()
         val stats = llamadas.groupBy { it.usuarioId }.map { (usuarioId, calls) ->
