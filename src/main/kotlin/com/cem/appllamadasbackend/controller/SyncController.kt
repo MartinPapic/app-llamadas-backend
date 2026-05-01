@@ -13,6 +13,7 @@ import com.cem.appllamadasbackend.domain.model.EstadoContacto
 import org.springframework.web.bind.annotation.*
 import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
 import com.cem.appllamadasbackend.domain.repository.TipificacionRepository
+import com.cem.appllamadasbackend.domain.repository.UsuarioListaRepository
 
 @RestController
 @RequestMapping("/")
@@ -20,7 +21,8 @@ class SyncController(
     private val contactoRepository: ContactoRepository,
     private val llamadaRepository: LlamadaRepository,
     private val usuarioRepository: UsuarioRepository,
-    private val tipificacionRepository: TipificacionRepository
+    private val tipificacionRepository: TipificacionRepository,
+    private val usuarioListaRepository: UsuarioListaRepository
 ) {
 
     // ─── DTOs ─────────────────────────────────────────────────────────────────
@@ -104,10 +106,16 @@ class SyncController(
                             it.tipificacion != null && tipificacionesCierre.contains(it.tipificacion.uppercase()) 
                         }
                         
+                        // Determinar si fue un intento válido (basado en el boolean que manda Android o backend fallback)
+                        val ultimaLlamadaEsValida = ultimaLlamada?.intentoValido ?: true
+                        if (ultimaLlamadaEsValida) {
+                            contacto.intentosValidos += 1
+                        }
+
                         if (huboExito) {
                             contacto.estado = EstadoContacto.CONTACTADO
-                        } else if (huboCierreForzado || contacto.intentos >= 5) {
-                            contacto.estado = EstadoContacto.DESISTIDO
+                        } else if (huboCierreForzado || contacto.intentosValidos >= 5) {
+                            contacto.estado = EstadoContacto.CERRADO_POR_INTENTOS
                         } else if (contacto.estado == EstadoContacto.PENDIENTE) {
                             contacto.estado = EstadoContacto.EN_GESTION
                         }
@@ -180,12 +188,14 @@ class SyncController(
         val ahora = System.currentTimeMillis()
         val diezMinutos = 10 * 60 * 1000
 
+        val misListas = usuarioListaRepository.findAllByUsuarioId(usuario.id).map { it.listaId }.toSet()
+
         val todos = contactoRepository.findAll().filter { contacto ->
             val bloqueadoPorOtro = contacto.bloqueadoPor != null && 
                                   contacto.bloqueadoPor != usuario.id && 
                                   contacto.bloqueadoPor != usuario.email &&
                                   (ahora - (contacto.fechaBloqueo ?: 0L)) < diezMinutos
-            !bloqueadoPorOtro
+            !bloqueadoPorOtro && (contacto.listaId in misListas)
         }
         
         val resultado = todos
@@ -212,6 +222,8 @@ class SyncController(
         val ahora = System.currentTimeMillis()
         val diezMinutos = 10 * 60 * 1000
 
+        val misListas = usuarioListaRepository.findAllByUsuarioId(usuario.id).map { it.listaId }.toSet()
+
         val pendientes = contactoRepository.findAll().filter { contacto ->
             val bloqueadoPorOtro = contacto.bloqueadoPor != null && 
                                   contacto.bloqueadoPor != usuario.id && 
@@ -220,7 +232,9 @@ class SyncController(
                                   
             contacto.estado != EstadoContacto.DESISTIDO && 
             contacto.estado != EstadoContacto.CONTACTADO &&
-            !bloqueadoPorOtro
+            contacto.estado != EstadoContacto.CERRADO &&
+            contacto.estado != EstadoContacto.CERRADO_POR_INTENTOS &&
+            !bloqueadoPorOtro && (contacto.listaId in misListas)
         }
         return ResponseEntity.ok(pendientes)
     }
