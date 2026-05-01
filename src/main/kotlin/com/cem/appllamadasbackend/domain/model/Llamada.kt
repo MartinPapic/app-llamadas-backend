@@ -23,5 +23,5 @@ data class Llamada(
     val observacion: String? = null,
     val proyectoId: String? = null,
     val listaId: String? = null,
-    val intentoValido: Boolean = true
+    val intentoValido: Boolean? = true
 )

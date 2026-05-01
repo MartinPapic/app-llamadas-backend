@@ -109,12 +109,12 @@ class SyncController(
                         // Determinar si fue un intento válido (basado en el boolean que manda Android o backend fallback)
                         val ultimaLlamadaEsValida = ultimaLlamada?.intentoValido ?: true
                         if (ultimaLlamadaEsValida) {
-                            contacto.intentosValidos += 1
+                            contacto.intentosValidos = (contacto.intentosValidos ?: 0) + 1
                         }
 
                         if (huboExito) {
                             contacto.estado = EstadoContacto.CONTACTADO
-                        } else if (huboCierreForzado || contacto.intentosValidos >= 5) {
+                        } else if (huboCierreForzado || (contacto.intentosValidos ?: 0) >= 5) {
                             contacto.estado = EstadoContacto.CERRADO_POR_INTENTOS
                         } else if (contacto.estado == EstadoContacto.PENDIENTE) {
                             contacto.estado = EstadoContacto.EN_GESTION

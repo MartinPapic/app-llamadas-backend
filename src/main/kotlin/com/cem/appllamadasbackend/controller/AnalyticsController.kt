@@ -165,7 +165,7 @@ class AnalyticsController(
                 tipificacion = llamada.tipificacion,
                 motivo = llamada.motivo,
                 observacion = llamada.observacion,
-                intentoValido = llamada.intentoValido
+                intentoValido = llamada.intentoValido ?: true
             )
         }.sortedByDescending { it.fechaLlamada }
 
