@@ -11,6 +11,13 @@ import org.springframework.web.bind.annotation.RestController
 import java.time.LocalDate
 import java.time.ZoneId
 import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
+import com.cem.appllamadasbackend.domain.repository.ProyectoRepository
+import com.cem.appllamadasbackend.domain.repository.ListaRepository
+import java.time.Instant
+import java.time.format.DateTimeFormatter
+
+import com.fasterxml.jackson.databind.PropertyNamingStrategies
+import com.fasterxml.jackson.databind.annotation.JsonNaming
 
 data class MetricasResponse(
     val totalContactos: Long,
@@ -23,22 +30,36 @@ data class MetricasResponse(
     val distribucionTipificaciones: Map<String, Double>
 )
 
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 data class ExportDataDto(
-    val llamadaId: String,
-    val contactoId: String,
-    val listaId: String?,
-    val referenciaId: String?,
-    val nombreContacto: String,
-    val telefonoContacto: String,
-    val fechaLlamada: Long,
-    val duracion: Int?,
-    val agenteId: String,
-    val emailAgente: String,
-    val resultado: String?,
-    val tipificacion: String?,
-    val motivo: String?,
-    val observacion: String?,
-    val intentoValido: Boolean
+    val event_id: String,
+    val event_type: String,
+    val event_timestamp: Long,
+    val record_id: String,
+    val record_phone: String,
+    val record_name: String,
+    val group_id: String?,
+    val group_name: String?,
+    val sub_group_id: String?,
+    val sub_group_name: String?,
+    val user_id: String,
+    val user_name: String,
+    val attempt_number: Int,
+    val is_valid_attempt: Boolean,
+    val attempt_date: String,
+    val duration_seconds: Int?,
+    val duration_minutes: Double?,
+    val classification: String?,
+    val is_closing_classification: Boolean,
+    val classification_reverted: Boolean,
+    val record_status: String,
+    val closure_reason: String?,
+    val total_valid_attempts: Int,
+    val is_blocked: Boolean,
+    val is_callable: Boolean,
+    val previous_event_id: String?,
+    val action_source: String,
+    val comments: String?
 )
 
 @RestController
@@ -46,7 +67,9 @@ data class ExportDataDto(
 class AnalyticsController(
     private val contactoRepository: ContactoRepository,
     private val llamadaRepository: LlamadaRepository,
-    private val usuarioRepository: UsuarioRepository
+    private val usuarioRepository: UsuarioRepository,
+    private val proyectoRepository: ProyectoRepository,
+    private val listaRepository: ListaRepository
 ) {
 
     @GetMapping("/metrics")
@@ -182,28 +205,59 @@ class AnalyticsController(
         val usuariosIds = llamadasList.map { it.usuarioId }.toSet()
         val usuariosMap = usuarioRepository.findAllById(usuariosIds).associateBy { it.id }
 
+        val todasLlamadasContactos = llamadaRepository.findAll().filter { it.contactoId in contactosIds }
+        val llamadasPorContacto = todasLlamadasContactos.groupBy { it.contactoId }.mapValues { (_, calls) -> calls.sortedBy { it.fechaInicio } }
+
+        val proyectosIds = llamadasList.mapNotNull { it.proyectoId }.toSet() + contactosMap.values.mapNotNull { it.proyectoId }.toSet()
+        val proyectosMap = proyectoRepository.findAllById(proyectosIds).associateBy { it.id }
+
+        val listasIds = llamadasList.mapNotNull { it.listaId }.toSet() + contactosMap.values.mapNotNull { it.listaId }.toSet()
+        val listasMap = listaRepository.findAllById(listasIds).associateBy { it.id }
+
+        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.of("America/Santiago"))
+
         val exportList = llamadasList.mapNotNull { llamada ->
             val contacto = contactosMap[llamada.contactoId] ?: return@mapNotNull null
             val agente = usuariosMap[llamada.usuarioId]
+            val proyecto = proyectosMap[llamada.proyectoId ?: contacto.proyectoId]
+            val lista = listasMap[llamada.listaId ?: contacto.listaId]
+            
+            val callsOfContact = llamadasPorContacto[contacto.id] ?: emptyList()
+            val index = callsOfContact.indexOfFirst { it.id == llamada.id }
+            val attemptNumber = if (index >= 0) index + 1 else 1
+            val prevEventId = if (index > 0) callsOfContact[index - 1].id else null
             
             ExportDataDto(
-                llamadaId = llamada.id,
-                contactoId = contacto.id,
-                listaId = llamada.listaId ?: contacto.listaId,
-                referenciaId = contacto.referenciaId,
-                nombreContacto = contacto.nombre,
-                telefonoContacto = contacto.telefono,
-                fechaLlamada = llamada.fechaInicio,
-                duracion = llamada.duracion,
-                agenteId = llamada.usuarioId,
-                emailAgente = agente?.email ?: "Desconocido",
-                resultado = llamada.resultado?.name,
-                tipificacion = llamada.tipificacion,
-                motivo = llamada.motivo,
-                observacion = llamada.observacion,
-                intentoValido = llamada.intentoValido ?: true
+                event_id = llamada.id,
+                event_type = "LLAMADA",
+                event_timestamp = llamada.fechaInicio,
+                record_id = contacto.referenciaId ?: contacto.id,
+                record_phone = contacto.telefono,
+                record_name = contacto.nombre,
+                group_id = proyecto?.id,
+                group_name = proyecto?.nombre,
+                sub_group_id = lista?.id,
+                sub_group_name = lista?.nombre,
+                user_id = llamada.usuarioId,
+                user_name = agente?.nombre ?: agente?.email ?: "Desconocido",
+                attempt_number = attemptNumber,
+                is_valid_attempt = llamada.intentoValido ?: true,
+                attempt_date = formatter.format(Instant.ofEpochMilli(llamada.fechaInicio)),
+                duration_seconds = llamada.duracion,
+                duration_minutes = llamada.duracion?.let { it / 60.0 },
+                classification = llamada.tipificacion,
+                is_closing_classification = contacto.estado.name == "CERRADO" || contacto.estado.name == "CERRADO_POR_INTENTOS" || contacto.estado.name == "DESISTIDO" || contacto.estado.name == "CONTACTADO",
+                classification_reverted = false,
+                record_status = contacto.estado.name,
+                closure_reason = llamada.motivo,
+                total_valid_attempts = contacto.intentosValidos ?: 0,
+                is_blocked = (contacto.intentosValidos ?: 0) >= 5 || contacto.estado.name == "CERRADO_POR_INTENTOS",
+                is_callable = contacto.estado.name == "PENDIENTE" || contacto.estado.name == "EN_GESTION",
+                previous_event_id = prevEventId,
+                action_source = "APP_ANDROID",
+                comments = llamada.observacion
             )
-        }.sortedByDescending { it.fechaLlamada }
+        }.sortedBy { it.event_timestamp }
 
         return ResponseEntity.ok(exportList)
     }
