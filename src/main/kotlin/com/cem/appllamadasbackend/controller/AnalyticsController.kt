@@ -156,18 +156,33 @@ class AnalyticsController(
     }
 
     @GetMapping("/analytics/export")
-    fun exportData(@RequestParam(required = false) proyectoId: String?): ResponseEntity<List<ExportDataDto>> {
-        val llamadas = if (proyectoId != null) llamadaRepository.findAll().filter { it.proyectoId == proyectoId }
-                       else llamadaRepository.findAll()
+    fun exportData(
+        @RequestParam(required = false) proyectoId: String?,
+        @RequestParam(required = false) agenteId: String?,
+        @RequestParam(required = false) fechaInicio: String?,
+        @RequestParam(required = false) fechaFin: String?
+    ): ResponseEntity<List<ExportDataDto>> {
+        var llamadas = llamadaRepository.findAll().asSequence()
+        if (proyectoId != null) llamadas = llamadas.filter { it.proyectoId == proyectoId }
+        if (agenteId != null) llamadas = llamadas.filter { it.usuarioId == agenteId }
+        if (fechaInicio != null) {
+            val start = LocalDate.parse(fechaInicio).atStartOfDay(ZoneId.of("America/Santiago")).toInstant().toEpochMilli()
+            llamadas = llamadas.filter { it.fechaInicio >= start }
+        }
+        if (fechaFin != null) {
+            val end = LocalDate.parse(fechaFin).plusDays(1).atStartOfDay(ZoneId.of("America/Santiago")).toInstant().toEpochMilli()
+            llamadas = llamadas.filter { it.fechaInicio < end }
+        }
+        val llamadasList = llamadas.toList()
                        
         // Optimización: cargar en memoria IDs necesarios
-        val contactosIds = llamadas.map { it.contactoId }.toSet()
+        val contactosIds = llamadasList.map { it.contactoId }.toSet()
         val contactosMap = contactoRepository.findAllById(contactosIds).associateBy { it.id }
         
-        val usuariosIds = llamadas.map { it.usuarioId }.toSet()
+        val usuariosIds = llamadasList.map { it.usuarioId }.toSet()
         val usuariosMap = usuarioRepository.findAllById(usuariosIds).associateBy { it.id }
 
-        val exportList = llamadas.mapNotNull { llamada ->
+        val exportList = llamadasList.mapNotNull { llamada ->
             val contacto = contactosMap[llamada.contactoId] ?: return@mapNotNull null
             val agente = usuariosMap[llamada.usuarioId]
             
