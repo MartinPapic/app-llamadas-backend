@@ -20,4 +20,7 @@ interface LlamadaRepository : JpaRepository<Llamada, String> {
 
     @Query("SELECT COUNT(l) FROM Llamada l WHERE l.fechaInicio >= :inicioDia")
     fun countLlamadasDesde(inicioDia: Long): Long
+
+    @Query("SELECT COUNT(DISTINCT l.usuarioId) FROM Llamada l WHERE l.fechaInicio >= :inicioDia")
+    fun countAgentesActivosDesde(inicioDia: Long): Long
 }

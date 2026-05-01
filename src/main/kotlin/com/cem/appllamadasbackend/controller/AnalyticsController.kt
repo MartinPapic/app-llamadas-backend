@@ -56,20 +56,22 @@ class AnalyticsController(
 
     @GetMapping("/analytics/realtime")
     fun getRealtimeMetrics(@RequestParam(required = false) fecha: String?): ResponseEntity<Map<String, Any>> {
-        val date = fecha?.let { try { LocalDate.parse(it) } catch (e: Exception) { LocalDate.now() } } ?: LocalDate.now()
-        val startOfDay = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val date = fecha?.let { try { LocalDate.parse(it) } catch (e: Exception) { LocalDate.now(ZoneId.of("America/Santiago")) } } ?: LocalDate.now(ZoneId.of("America/Santiago"))
+        val startOfDay = date.atStartOfDay(ZoneId.of("America/Santiago")).toInstant().toEpochMilli()
 
         val llamadasEmitidasHoy = llamadaRepository.countLlamadasDesde(startOfDay)
+        val agentesActivos = llamadaRepository.countAgentesActivosDesde(startOfDay)
         val resultados = llamadaRepository.countResultadosDesde(startOfDay)
         val distribucion = resultados.associate { (it.resultado?.name ?: "UNKNOWN") to it.cantidad }
         
-        val contestan = distribucion["CONTESTA"] ?: 0L
+        val contestan = (distribucion[ResultadoLlamada.CONTACTADO_EFECTIVO.name] ?: 0L) + (distribucion[ResultadoLlamada.CONTACTADO_NO_EFECTIVO.name] ?: 0L)
         val tasaContactabilidad = if (llamadasEmitidasHoy > 0) (contestan.toDouble() / llamadasEmitidasHoy) * 100 else 0.0
 
         val response = mapOf(
             "llamadasEmitidasHoy" to llamadasEmitidasHoy,
             "tasaContactabilidadDiaria" to tasaContactabilidad,
-            "distribucionResultados" to distribucion
+            "distribucionResultados" to distribucion,
+            "totalAgentesActivos" to agentesActivos
         )
 
         return ResponseEntity.ok(response)
