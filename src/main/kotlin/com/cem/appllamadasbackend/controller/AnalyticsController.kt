@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.time.LocalDate
 import java.time.ZoneId
+import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
 
 data class MetricasResponse(
     val totalContactos: Long,
@@ -20,11 +21,30 @@ data class MetricasResponse(
     val tasaContacto: Double
 )
 
+data class ExportDataDto(
+    val llamadaId: String,
+    val contactoId: String,
+    val listaId: String?,
+    val referenciaId: String?,
+    val nombreContacto: String,
+    val telefonoContacto: String,
+    val fechaLlamada: Long,
+    val duracion: Int?,
+    val agenteId: String,
+    val emailAgente: String,
+    val resultado: String?,
+    val tipificacion: String?,
+    val motivo: String?,
+    val observacion: String?,
+    val intentoValido: Boolean
+)
+
 @RestController
 @RequestMapping
 class AnalyticsController(
     private val contactoRepository: ContactoRepository,
-    private val llamadaRepository: LlamadaRepository
+    private val llamadaRepository: LlamadaRepository,
+    private val usuarioRepository: UsuarioRepository
 ) {
 
     @GetMapping("/metrics")
@@ -112,5 +132,43 @@ class AnalyticsController(
             )
         }
         return ResponseEntity.ok(stats)
+    }
+
+    @GetMapping("/analytics/export")
+    fun exportData(@RequestParam(required = false) proyectoId: String?): ResponseEntity<List<ExportDataDto>> {
+        val llamadas = if (proyectoId != null) llamadaRepository.findAll().filter { it.proyectoId == proyectoId }
+                       else llamadaRepository.findAll()
+                       
+        // Optimización: cargar en memoria IDs necesarios
+        val contactosIds = llamadas.map { it.contactoId }.toSet()
+        val contactosMap = contactoRepository.findAllById(contactosIds).associateBy { it.id }
+        
+        val usuariosIds = llamadas.map { it.usuarioId }.toSet()
+        val usuariosMap = usuarioRepository.findAllById(usuariosIds).associateBy { it.id }
+
+        val exportList = llamadas.mapNotNull { llamada ->
+            val contacto = contactosMap[llamada.contactoId] ?: return@mapNotNull null
+            val agente = usuariosMap[llamada.usuarioId]
+            
+            ExportDataDto(
+                llamadaId = llamada.id,
+                contactoId = contacto.id,
+                listaId = llamada.listaId ?: contacto.listaId,
+                referenciaId = contacto.referenciaId,
+                nombreContacto = contacto.nombre,
+                telefonoContacto = contacto.telefono,
+                fechaLlamada = llamada.fechaInicio,
+                duracion = llamada.duracion,
+                agenteId = llamada.usuarioId,
+                emailAgente = agente?.email ?: "Desconocido",
+                resultado = llamada.resultado?.name,
+                tipificacion = llamada.tipificacion,
+                motivo = llamada.motivo,
+                observacion = llamada.observacion,
+                intentoValido = llamada.intentoValido
+            )
+        }.sortedByDescending { it.fechaLlamada }
+
+        return ResponseEntity.ok(exportList)
     }
 }
