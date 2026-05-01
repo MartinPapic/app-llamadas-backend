@@ -34,7 +34,7 @@ data class MetricasResponse(
 data class ExportDataDto(
     val event_id: String,
     val event_type: String,
-    val event_timestamp: Long,
+    val event_timestamp: String,
     val record_id: String,
     val record_phone: String,
     val record_name: String,
@@ -230,7 +230,7 @@ class AnalyticsController(
             ExportDataDto(
                 event_id = llamada.id,
                 event_type = "LLAMADA",
-                event_timestamp = llamada.fechaInicio,
+                event_timestamp = formatter.format(Instant.ofEpochMilli(llamada.fechaInicio)),
                 record_id = contacto.referenciaId ?: contacto.id,
                 record_phone = contacto.telefono,
                 record_name = contacto.nombre,
