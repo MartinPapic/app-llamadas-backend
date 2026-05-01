@@ -15,10 +15,12 @@ import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
 data class MetricasResponse(
     val totalContactos: Long,
     val totalLlamadas: Long,
+    val totalLlamadasValidas: Long,
     val totalContestan: Long,
     val totalNoContestan: Long,
     val duracionPromedio: Double,
-    val tasaContacto: Double
+    val tasaContacto: Double,
+    val distribucionTipificaciones: Map<String, Double>
 )
 
 data class ExportDataDto(
@@ -52,43 +54,60 @@ class AnalyticsController(
         val totalContactos = if (proyectoId != null) contactoRepository.findAll().count { it.proyectoId == proyectoId }.toLong() 
                             else contactoRepository.count()
         
-        val todasLlamadas  = if (proyectoId != null) llamadaRepository.findAll().filter { it.proyectoId == proyectoId }
+        val todasLlamadas = if (proyectoId != null) llamadaRepository.findAll().filter { it.proyectoId == proyectoId }
                             else llamadaRepository.findAll()
                             
-        val totalLlamadas  = todasLlamadas.size.toLong()
-        val contestan      = todasLlamadas.count { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO || it.resultado == ResultadoLlamada.CONTACTADO_NO_EFECTIVO }.toLong()
-        val noContestan    = todasLlamadas.count { it.resultado == ResultadoLlamada.NO_CONTACTADO }.toLong()
-        val durPromedio    = todasLlamadas.mapNotNull { it.duracion }.let {
+        val llamadasValidas = todasLlamadas.filter { it.intentoValido != false }
+                            
+        val totalLlamadas = todasLlamadas.size.toLong()
+        val totalLlamadasValidas = llamadasValidas.size.toLong()
+        val contestan = llamadasValidas.count { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO || it.resultado == ResultadoLlamada.CONTACTADO_NO_EFECTIVO }.toLong()
+        val noContestan = llamadasValidas.count { it.resultado == ResultadoLlamada.NO_CONTACTADO }.toLong()
+        val durPromedio = llamadasValidas.mapNotNull { it.duracion }.let {
             if (it.isEmpty()) 0.0 else it.average()
         }
-        val contestanEfectivos = todasLlamadas.count { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO }.toDouble()
-        val tasa = if (totalLlamadas > 0) (contestanEfectivos / totalLlamadas) * 100 else 0.0
+        val contestanEfectivos = llamadasValidas.count { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO }.toDouble()
+        val tasa = if (totalLlamadasValidas > 0) (contestanEfectivos / totalLlamadasValidas) * 100 else 0.0
+
+        val distribucionTipificaciones = llamadasValidas.filter { it.tipificacion != null }
+            .groupBy { it.tipificacion!! }
+            .mapValues { (_, v) -> if (totalLlamadasValidas > 0) (v.size.toDouble() / totalLlamadasValidas) * 100 else 0.0 }
 
         return ResponseEntity.ok(MetricasResponse(
-            totalContactos  = totalContactos,
-            totalLlamadas   = totalLlamadas,
-            totalContestan  = contestan,
+            totalContactos = totalContactos,
+            totalLlamadas = totalLlamadas,
+            totalLlamadasValidas = totalLlamadasValidas,
+            totalContestan = contestan,
             totalNoContestan = noContestan,
             duracionPromedio = durPromedio,
-            tasaContacto    = tasa
+            tasaContacto = tasa,
+            distribucionTipificaciones = distribucionTipificaciones
         ))
     }
 
     @GetMapping("/analytics/realtime")
-    fun getRealtimeMetrics(@RequestParam(required = false) fecha: String?): ResponseEntity<Map<String, Any>> {
+    fun getRealtimeMetrics(
+        @RequestParam(required = false) fecha: String?,
+        @RequestParam(required = false) proyectoId: String?
+    ): ResponseEntity<Map<String, Any>> {
         val date = fecha?.let { try { LocalDate.parse(it) } catch (e: Exception) { LocalDate.now(ZoneId.of("America/Santiago")) } } ?: LocalDate.now(ZoneId.of("America/Santiago"))
         val startOfDay = date.atStartOfDay(ZoneId.of("America/Santiago")).toInstant().toEpochMilli()
 
-        val llamadasEmitidasHoy = llamadaRepository.countLlamadasDesde(startOfDay)
-        val agentesActivos = llamadaRepository.countAgentesActivosDesde(startOfDay)
-        val resultados = llamadaRepository.countResultadosDesde(startOfDay)
-        val distribucion = resultados.associate { (it.resultado?.name ?: "UNKNOWN") to it.cantidad }
+        var llamadasDeHoy = llamadaRepository.findAll().filter { it.fechaInicio >= startOfDay }
+        if (proyectoId != null) {
+            llamadasDeHoy = llamadasDeHoy.filter { it.proyectoId == proyectoId }
+        }
+        val llamadasValidasDeHoy = llamadasDeHoy.filter { it.intentoValido != false }
+        val llamadasEmitidasHoyValidas = llamadasValidasDeHoy.size.toLong()
+        
+        val agentesActivos = llamadasDeHoy.map { it.usuarioId }.distinct().count()
+        val distribucion = llamadasValidasDeHoy.groupBy { it.resultado?.name ?: "UNKNOWN" }.mapValues { it.value.size.toLong() }
         
         val contestan = (distribucion[ResultadoLlamada.CONTACTADO_EFECTIVO.name] ?: 0L) + (distribucion[ResultadoLlamada.CONTACTADO_NO_EFECTIVO.name] ?: 0L)
-        val tasaContactabilidad = if (llamadasEmitidasHoy > 0) (contestan.toDouble() / llamadasEmitidasHoy) * 100 else 0.0
+        val tasaContactabilidad = if (llamadasEmitidasHoyValidas > 0) (contestan.toDouble() / llamadasEmitidasHoyValidas) * 100 else 0.0
 
         val response = mapOf(
-            "llamadasEmitidasHoy" to llamadasEmitidasHoy,
+            "llamadasEmitidasHoy" to llamadasEmitidasHoyValidas,
             "tasaContactabilidadDiaria" to tasaContactabilidad,
             "distribucionResultados" to distribucion,
             "totalAgentesActivos" to agentesActivos
@@ -112,8 +131,10 @@ class AnalyticsController(
     }
 
     @GetMapping("/analytics/agents")
-    fun getAgentStats(): ResponseEntity<List<Map<String, Any>>> {
-        val llamadas = llamadaRepository.findAll()
+    fun getAgentStats(@RequestParam(required = false) proyectoId: String?): ResponseEntity<List<Map<String, Any>>> {
+        val llamadasTodas = if (proyectoId != null) llamadaRepository.findAll().filter { it.proyectoId == proyectoId } 
+                       else llamadaRepository.findAll()
+        val llamadas = llamadasTodas.filter { it.intentoValido != false }
         val stats = llamadas.groupBy { it.usuarioId }.map { (usuarioId, calls) ->
             val total = calls.size
             val efectivos = calls.count { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO }
