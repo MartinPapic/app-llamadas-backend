@@ -10,12 +10,17 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 import java.util.UUID
 
+import com.cem.appllamadasbackend.domain.repository.ListaRepository
+import com.cem.appllamadasbackend.domain.repository.UsuarioListaRepository
+
 @RestController
 @RequestMapping("/projects")
 class ProyectoController(
     private val proyectoRepository: ProyectoRepository,
     private val usuarioProyectoRepository: UsuarioProyectoRepository,
-    private val usuarioRepository: UsuarioRepository
+    private val usuarioRepository: UsuarioRepository,
+    private val listaRepository: ListaRepository,
+    private val usuarioListaRepository: UsuarioListaRepository
 ) {
 
     @GetMapping
@@ -40,8 +45,14 @@ class ProyectoController(
         val usuario = usuarioRepository.findByEmail(email).orElse(null)
             ?: return ResponseEntity.status(401).build()
         
-        val asignaciones = usuarioProyectoRepository.findAllByUsuarioId(usuario.id)
-        val proyectoIds = asignaciones.map { it.proyectoId }
+        // Proyectos asignados directamente (legacy)
+        val asignacionesDirectas = usuarioProyectoRepository.findAllByUsuarioId(usuario.id).map { it.proyectoId }
+        
+        // Proyectos derivados de las listas asignadas
+        val listasAsignadas = usuarioListaRepository.findAllByUsuarioId(usuario.id).map { it.listaId }
+        val proyectosDeListas = listaRepository.findAllById(listasAsignadas).map { it.proyectoId }
+        
+        val proyectoIds = (asignacionesDirectas + proyectosDeListas).distinct()
         val proyectos = proyectoRepository.findAllById(proyectoIds)
         
         return ResponseEntity.ok(proyectos)
