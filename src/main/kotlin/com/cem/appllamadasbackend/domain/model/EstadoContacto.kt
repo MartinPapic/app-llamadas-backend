@@ -6,7 +6,9 @@ enum class EstadoContacto {
     PENDIENTE,
     EN_GESTION,
     CONTACTADO,
-    DESISTIDO;
+    DESISTIDO,
+    CERRADO,
+    CERRADO_POR_INTENTOS;
 
     companion object {
         @JvmStatic

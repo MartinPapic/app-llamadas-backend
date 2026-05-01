@@ -38,12 +38,14 @@ class DashboardController(
     @PostMapping("/admin/contacts/upload")
     fun uploadContactos(
         @RequestBody contactos: List<Contacto>,
-        @RequestParam(required = false) proyectoId: String?
+        @RequestParam(required = false) proyectoId: String?,
+        @RequestParam(required = false) listaId: String?
     ): ResponseEntity<Map<String, Any>> {
-        val contactosAProcesar = if (proyectoId != null) {
-            contactos.map { it.copy(proyectoId = proyectoId) }
-        } else {
-            contactos
+        val contactosAProcesar = contactos.map { c ->
+            c.copy(
+                proyectoId = proyectoId ?: c.proyectoId,
+                listaId = listaId ?: c.listaId
+            )
         }
         val saved = contactoRepository.saveAll(contactosAProcesar)
         return ResponseEntity.ok(mapOf("mensaje" to "Contactos importados exitosamente", "cantidad" to saved.size))

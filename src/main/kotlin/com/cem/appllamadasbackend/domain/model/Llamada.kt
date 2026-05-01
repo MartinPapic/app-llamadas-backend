@@ -21,5 +21,7 @@ data class Llamada(
     val tipificacion: String? = null,
     val motivo: String? = null,
     val observacion: String? = null,
-    val proyectoId: String? = null
+    val proyectoId: String? = null,
+    val listaId: String? = null,
+    val intentoValido: Boolean = true
 )

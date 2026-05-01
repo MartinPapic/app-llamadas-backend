@@ -20,6 +20,9 @@ data class Contacto(
     var ultimaTipificacion: String? = null,
     var ultimaObservacion: String? = null,
     val proyectoId: String? = null,
+    val listaId: String? = null,
+    val referenciaId: String? = null,
+    var intentosValidos: Int = 0,
     var agenteId: String? = null,
     var bloqueadoPor: String? = null,
     var fechaBloqueo: Long? = null
