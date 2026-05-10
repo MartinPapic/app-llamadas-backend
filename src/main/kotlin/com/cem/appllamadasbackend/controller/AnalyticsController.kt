@@ -140,10 +140,21 @@ class AnalyticsController(
     }
 
     @GetMapping("/analytics/funnel")
-    fun getFunnel(): ResponseEntity<Map<String, Any>> {
-        val totalBase = contactoRepository.count()
-        val distribucionDb = contactoRepository.countByEstado()
-        val estadosMap = distribucionDb.associate { it.estado.name to it.cantidad }
+    fun getFunnel(@RequestParam(required = false) proyectoId: String?): ResponseEntity<Map<String, Any>> {
+        val totalBase = if (proyectoId != null) {
+            contactoRepository.findAll().count { it.proyectoId == proyectoId }.toLong()
+        } else {
+            contactoRepository.count()
+        }
+        
+        val baseContactos = if (proyectoId != null) {
+            contactoRepository.findAll().filter { it.proyectoId == proyectoId }
+        } else {
+            contactoRepository.findAll()
+        }
+        
+        val estadosMap = baseContactos.groupBy { it.estado.name }
+                                     .mapValues { it.value.size.toLong() }
 
         val response = mapOf(
             "totalBase" to totalBase,

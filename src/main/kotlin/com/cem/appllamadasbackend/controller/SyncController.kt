@@ -73,6 +73,30 @@ class SyncController(
         return ResponseEntity.ok(mapOf("success" to true, "expiresIn" to diezMinutos))
     }
 
+    // ─── POST /contacts/{id}/unlock — Desbloqueo manual/Reinicio de intentos ────
+    @PostMapping("/contacts/{id}/unlock")
+    @Transactional
+    fun unlockContacto(
+        @PathVariable id: String
+    ): ResponseEntity<Map<String, Any>> {
+        val contactoOpt = contactoRepository.findById(id)
+        if (!contactoOpt.isPresent) return ResponseEntity.notFound().build()
+        val contacto = contactoOpt.get()
+
+        // Reiniciar contadores y estado
+        contacto.intentosValidos = 0
+        contacto.intentos = 0
+        contacto.estado = EstadoContacto.PENDIENTE
+        
+        // Liberar bloqueos de pool por si acaso
+        contacto.bloqueadoPor = null
+        contacto.fechaBloqueo = null
+
+        contactoRepository.save(contacto)
+
+        return ResponseEntity.ok(mapOf("success" to true, "message" to "Contacto reiniciado correctamente"))
+    }
+
     @PostMapping("/sync")
     @Transactional
     fun syncData(
