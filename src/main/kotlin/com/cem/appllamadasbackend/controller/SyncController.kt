@@ -103,15 +103,18 @@ class SyncController(
         @RequestBody payload: SyncPayload,
         @AuthenticationPrincipal email: String
     ): ResponseEntity<SyncResponse> {
+        // Filtrar llamadas: Si no están tipificadas, ignorarlas (no cuentan como intento)
+        val llamadasTipificadas = payload.llamadas.filter { !it.tipificacion.isNullOrBlank() }
+
         return try {
-            // 1. Persistir llamadas primero
-            if (payload.llamadas.isNotEmpty()) {
-                llamadaRepository.saveAll(payload.llamadas)
+            // 1. Persistir llamadas validas primero
+            if (llamadasTipificadas.isNotEmpty()) {
+                llamadaRepository.saveAll(llamadasTipificadas)
             }
 
-            // 2. Control Server-Side de estados (Authoritative State)
-            if (payload.llamadas.isNotEmpty()) {
-                payload.llamadas.groupBy { it.contactoId }.forEach { (contactoId, llamadasDelContacto) ->
+            // 2. Control Server-Side de estados
+            if (llamadasTipificadas.isNotEmpty()) {
+                llamadasTipificadas.groupBy { it.contactoId }.forEach { (contactoId, llamadasDelContacto) ->
                     val contactoOpt = contactoRepository.findById(contactoId)
                     if (contactoOpt.isPresent) {
                         val contacto = contactoOpt.get()
