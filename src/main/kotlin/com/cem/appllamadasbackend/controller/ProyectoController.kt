@@ -12,6 +12,8 @@ import java.util.UUID
 
 import com.cem.appllamadasbackend.domain.repository.ListaRepository
 import com.cem.appllamadasbackend.domain.repository.UsuarioListaRepository
+import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.transaction.annotation.Transactional
 
 @RestController
 @RequestMapping("/projects")
@@ -20,7 +22,8 @@ class ProyectoController(
     private val usuarioProyectoRepository: UsuarioProyectoRepository,
     private val usuarioRepository: UsuarioRepository,
     private val listaRepository: ListaRepository,
-    private val usuarioListaRepository: UsuarioListaRepository
+    private val usuarioListaRepository: UsuarioListaRepository,
+    private val jdbcTemplate: JdbcTemplate
 ) {
 
     @GetMapping
@@ -35,9 +38,45 @@ class ProyectoController(
     }
 
     @DeleteMapping("/{id}")
+    @Transactional
     fun eliminar(@PathVariable id: String): ResponseEntity<Void> {
+        // 1. Eliminar llamadas relacionadas (por proyecto_id, lista_id o contacto_id)
+        jdbcTemplate.update("""
+            DELETE FROM llamada 
+            WHERE proyecto_id = ? 
+               OR lista_id IN (SELECT id FROM lista WHERE proyecto_id = ?) 
+               OR contacto_id IN (SELECT id FROM contacto WHERE proyecto_id = ? OR lista_id IN (SELECT id FROM lista WHERE proyecto_id = ?))
+        """, id, id, id, id)
+
+        // 2. Eliminar encuestas de contactos de este proyecto o sus listas
+        jdbcTemplate.update("""
+            DELETE FROM encuesta 
+            WHERE contacto_id IN (SELECT id FROM contacto WHERE proyecto_id = ? OR lista_id IN (SELECT id FROM lista WHERE proyecto_id = ?))
+        """, id, id)
+
+        // 3. Eliminar asignaciones de agentes a listas de este proyecto
+        jdbcTemplate.update("""
+            DELETE FROM usuario_lista 
+            WHERE lista_id IN (SELECT id FROM lista WHERE proyecto_id = ?)
+        """, id)
+
+        // 4. Eliminar asignaciones de agentes a este proyecto
+        jdbcTemplate.update("DELETE FROM usuario_proyecto WHERE proyecto_id = ?", id)
+
+        // 5. Eliminar contactos de este proyecto o de sus listas
+        jdbcTemplate.update("""
+            DELETE FROM contacto 
+            WHERE proyecto_id = ? 
+               OR lista_id IN (SELECT id FROM lista WHERE proyecto_id = ?)
+        """, id, id)
+
+        // 6. Eliminar listas del proyecto
+        jdbcTemplate.update("DELETE FROM lista WHERE proyecto_id = ?", id)
+
+        // 7. Eliminar el proyecto principal
         proyectoRepository.deleteById(id)
-        return ResponseEntity.ok().build()
+
+        return ResponseEntity.noContent().build()
     }
 
     @GetMapping("/agente")
