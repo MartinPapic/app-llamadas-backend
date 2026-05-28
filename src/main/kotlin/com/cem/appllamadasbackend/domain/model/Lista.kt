@@ -12,5 +12,6 @@ data class Lista(
     val nombre: String = "",
     val proyectoId: String = "",
     val fechaCreacion: Long = 0L,
-    val estado: String = "ACTIVO"
+    val estado: String = "ACTIVO",
+    val maxGestionExitosa: Int? = null
 )

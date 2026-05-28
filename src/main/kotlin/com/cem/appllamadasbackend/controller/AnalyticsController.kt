@@ -27,7 +27,8 @@ data class MetricasResponse(
     val totalNoContestan: Long,
     val duracionPromedio: Double,
     val tasaContacto: Double,
-    val distribucionTipificaciones: Map<String, Double>
+    val distribucionTipificaciones: Map<String, Double>,
+    val totalGestionExitosa: Long
 )
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
@@ -96,6 +97,8 @@ class AnalyticsController(
             .groupBy { it.tipificacion!! }
             .mapValues { (_, v) -> if (totalLlamadasValidas > 0) (v.size.toDouble() / totalLlamadasValidas) * 100 else 0.0 }
 
+        val totalGestionExitosa = llamadasValidas.count { it.motivo == "GESTION_EXITOSA" }.toLong()
+
         return ResponseEntity.ok(MetricasResponse(
             totalContactos = totalContactos,
             totalLlamadas = totalLlamadas,
@@ -104,7 +107,8 @@ class AnalyticsController(
             totalNoContestan = noContestan,
             duracionPromedio = durPromedio,
             tasaContacto = tasa,
-            distribucionTipificaciones = distribucionTipificaciones
+            distribucionTipificaciones = distribucionTipificaciones,
+            totalGestionExitosa = totalGestionExitosa
         ))
     }
 
@@ -133,7 +137,8 @@ class AnalyticsController(
             "llamadasEmitidasHoy" to llamadasEmitidasHoyValidas,
             "tasaContactabilidadDiaria" to tasaContactabilidad,
             "distribucionResultados" to distribucion,
-            "totalAgentesActivos" to agentesActivos
+            "totalAgentesActivos" to agentesActivos,
+            "gestionExitosaHoy" to llamadasValidasDeHoy.count { it.motivo == "GESTION_EXITOSA" }
         )
 
         return ResponseEntity.ok(response)
@@ -174,6 +179,7 @@ class AnalyticsController(
             val efectivos = calls.count { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO }
             val noEfectivos = calls.count { it.resultado == ResultadoLlamada.CONTACTADO_NO_EFECTIVO }
             val noContestan = calls.count { it.resultado == ResultadoLlamada.NO_CONTACTADO }
+            val gestionExitosa = calls.count { it.motivo == "GESTION_EXITOSA" }
             val duracionAvg = if (total > 0) calls.mapNotNull { it.duracion }.average() else 0.0
             
             mapOf(
@@ -182,6 +188,7 @@ class AnalyticsController(
                 "efectivos" to efectivos,
                 "noEfectivos" to noEfectivos,
                 "noContestan" to noContestan,
+                "gestionExitosa" to gestionExitosa,
                 "duracionPromedio" to duracionAvg,
                 "tasaEfectividad" to if (total > 0) (efectivos.toDouble() / total) * 100 else 0.0
             )

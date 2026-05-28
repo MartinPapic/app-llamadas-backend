@@ -5,6 +5,9 @@ import com.cem.appllamadasbackend.domain.model.UsuarioLista
 import com.cem.appllamadasbackend.domain.repository.ListaRepository
 import com.cem.appllamadasbackend.domain.repository.UsuarioListaRepository
 import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
+import com.cem.appllamadasbackend.domain.repository.LlamadaRepository
+import com.cem.appllamadasbackend.domain.repository.ContactoRepository
+import com.cem.appllamadasbackend.domain.model.EstadoContacto
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
@@ -15,7 +18,9 @@ import java.util.UUID
 class ListaController(
     private val listaRepository: ListaRepository,
     private val usuarioListaRepository: UsuarioListaRepository,
-    private val usuarioRepository: UsuarioRepository
+    private val usuarioRepository: UsuarioRepository,
+    private val llamadaRepository: LlamadaRepository,
+    private val contactoRepository: ContactoRepository
 ) {
 
     @GetMapping("/proyecto/{proyectoId}")
@@ -29,7 +34,33 @@ class ListaController(
             id = id,
             fechaCreacion = if (lista.fechaCreacion == 0L) System.currentTimeMillis() else lista.fechaCreacion
         )
-        return ResponseEntity.ok(listaRepository.save(nueva))
+        val guardada = listaRepository.save(nueva)
+        
+        // Evaluar límites de gestión exitosa de forma inmediata
+        try {
+            val exitosas = llamadaRepository.findAll().count { it.listaId == guardada.id && it.motivo == "GESTION_EXITOSA" }
+            val max = guardada.maxGestionExitosa
+            
+            if (max != null && max > 0 && exitosas >= max) {
+                val contactosAInhabilitar = contactoRepository.findAll()
+                    .filter { it.listaId == guardada.id && (it.estado == EstadoContacto.PENDIENTE || it.estado == EstadoContacto.EN_GESTION) }
+                if (contactosAInhabilitar.isNotEmpty()) {
+                    contactosAInhabilitar.forEach { it.estado = EstadoContacto.CERRADO }
+                    contactoRepository.saveAll(contactosAInhabilitar)
+                }
+            } else {
+                val contactosARehabilitar = contactoRepository.findAll()
+                    .filter { it.listaId == guardada.id && it.estado == EstadoContacto.CERRADO && (it.intentosValidos ?: 0) < 5 }
+                if (contactosARehabilitar.isNotEmpty()) {
+                    contactosARehabilitar.forEach { it.estado = EstadoContacto.PENDIENTE }
+                    contactoRepository.saveAll(contactosARehabilitar)
+                }
+            }
+        } catch (e: Exception) {
+            System.err.println("⚠️ [ListaController] Error al evaluar límites de lista tras guardar: ${e.message}")
+        }
+        
+        return ResponseEntity.ok(guardada)
     }
 
     @DeleteMapping("/{id}")

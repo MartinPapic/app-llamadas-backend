@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*
 import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
 import com.cem.appllamadasbackend.domain.repository.TipificacionRepository
 import com.cem.appllamadasbackend.domain.repository.UsuarioListaRepository
+import com.cem.appllamadasbackend.domain.repository.ListaRepository
 
 @RestController
 @RequestMapping("/")
@@ -22,7 +23,8 @@ class SyncController(
     private val llamadaRepository: LlamadaRepository,
     private val usuarioRepository: UsuarioRepository,
     private val tipificacionRepository: TipificacionRepository,
-    private val usuarioListaRepository: UsuarioListaRepository
+    private val usuarioListaRepository: UsuarioListaRepository,
+    private val listaRepository: ListaRepository
 ) {
 
     // ─── DTOs ─────────────────────────────────────────────────────────────────
@@ -176,6 +178,37 @@ class SyncController(
                      } else null
                 }
                 contactoRepository.saveAll(contactosToSave)
+            }
+
+            // 4. Verificar topes de gestión exitosa por lista (Bloqueo y Desbloqueo automático)
+            try {
+                val todasListas = listaRepository.findAll()
+                todasListas.forEach { lista ->
+                    val exitosas = llamadaRepository.findAll().count { it.listaId == lista.id && it.motivo == "GESTION_EXITOSA" }
+                    val max = lista.maxGestionExitosa
+                    
+                    if (max != null && max > 0 && exitosas >= max) {
+                        // Inhabilitar contactos de esta lista que estén pendientes o en gestión
+                        val contactosAInhabilitar = contactoRepository.findAll()
+                            .filter { it.listaId == lista.id && (it.estado == EstadoContacto.PENDIENTE || it.estado == EstadoContacto.EN_GESTION) }
+                        if (contactosAInhabilitar.isNotEmpty()) {
+                            contactosAInhabilitar.forEach { it.estado = EstadoContacto.CERRADO }
+                            contactoRepository.saveAll(contactosAInhabilitar)
+                            println("🔒 [SyncController] Lista '${lista.nombre}' alcanzo el tope de $max gestiones exitosas. Se inhabilitaron ${contactosAInhabilitar.size} contactos.")
+                        }
+                    } else {
+                        // Si no hay tope o no se ha alcanzado el tope, rehabilitar contactos que habían sido inhabilitados (CERRADO) por esta regla
+                        val contactosARehabilitar = contactoRepository.findAll()
+                            .filter { it.listaId == lista.id && it.estado == EstadoContacto.CERRADO && (it.intentosValidos ?: 0) < 5 }
+                        if (contactosARehabilitar.isNotEmpty()) {
+                            contactosARehabilitar.forEach { it.estado = EstadoContacto.PENDIENTE }
+                            contactoRepository.saveAll(contactosARehabilitar)
+                            println("🔓 [SyncController] Lista '${lista.nombre}' tiene espacio ($exitosas/${max ?: "Sin limite"}). Se rehabilitaron ${contactosARehabilitar.size} contactos.")
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                System.err.println("⚠️ [SyncController] Error al verificar topes de listas: ${e.message}")
             }
 
             val ids = payload.llamadas.map { it.id }
