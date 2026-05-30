@@ -10,6 +10,9 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import com.cem.appllamadasbackend.domain.model.ResultadoLlamada
 import com.cem.appllamadasbackend.domain.model.RolUsuario
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
 
 
 
@@ -28,8 +31,18 @@ class DashboardController(
         ResponseEntity.ok(llamadaRepository.findAll())
 
     @GetMapping("/admin/contacts")
-    fun getContactos(): ResponseEntity<List<Contacto>> =
-        ResponseEntity.ok(contactoRepository.findAll())
+    fun getContactos(
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "100") size: Int,
+        @RequestParam(required = false) proyectoId: String?
+    ): ResponseEntity<Page<Contacto>> {
+        val pageable = PageRequest.of(page, size, Sort.by("fechaCreacion").descending())
+        return if (proyectoId.isNullOrBlank()) {
+            ResponseEntity.ok(contactoRepository.findAll(pageable))
+        } else {
+            ResponseEntity.ok(contactoRepository.findByProyectoId(proyectoId, pageable))
+        }
+    }
 
     @PostMapping("/admin/contacts")
     fun crearContacto(@RequestBody contacto: Contacto): ResponseEntity<Contacto> =
