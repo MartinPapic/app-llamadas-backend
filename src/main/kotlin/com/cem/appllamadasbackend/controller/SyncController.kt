@@ -143,7 +143,9 @@ class SyncController(
 
                         if (huboExito) {
                             contacto.estado = EstadoContacto.CONTACTADO
-                        } else if (huboCierreForzado || (contacto.intentosValidos ?: 0) >= 5) {
+                        } else if (huboCierreForzado) {
+                            contacto.estado = EstadoContacto.CERRADO
+                        } else if ((contacto.intentosValidos ?: 0) >= 5) {
                             contacto.estado = EstadoContacto.CERRADO_POR_INTENTOS
                         } else if (contacto.estado == EstadoContacto.PENDIENTE) {
                             contacto.estado = EstadoContacto.EN_GESTION
