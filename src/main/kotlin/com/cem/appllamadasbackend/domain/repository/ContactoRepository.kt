@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import com.cem.appllamadasbackend.domain.model.EstadoContacto
 
 interface EstadoDistribucion {
     val estado: com.cem.appllamadasbackend.domain.model.EstadoContacto
@@ -20,4 +21,6 @@ interface ContactoRepository : JpaRepository<Contacto, String> {
     fun countByEstado(): List<EstadoDistribucion>
 
     fun findByProyectoId(proyectoId: String, pageable: Pageable): Page<Contacto>
+    fun findByEstado(estado: EstadoContacto, pageable: Pageable): Page<Contacto>
+    fun findByProyectoIdAndEstado(proyectoId: String, estado: EstadoContacto, pageable: Pageable): Page<Contacto>
 }

@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import com.cem.appllamadasbackend.domain.model.ResultadoLlamada
 import com.cem.appllamadasbackend.domain.model.RolUsuario
+import com.cem.appllamadasbackend.domain.model.EstadoContacto
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
@@ -34,13 +35,20 @@ class DashboardController(
     fun getContactos(
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "100") size: Int,
-        @RequestParam(required = false) proyectoId: String?
+        @RequestParam(required = false) proyectoId: String?,
+        @RequestParam(required = false) estado: String?
     ): ResponseEntity<Page<Contacto>> {
         val pageable = PageRequest.of(page, size, Sort.by("fechaCreacion").descending())
-        return if (proyectoId.isNullOrBlank()) {
-            ResponseEntity.ok(contactoRepository.findAll(pageable))
-        } else {
+        val enumEstado = estado?.let { EstadoContacto.fromString(it) }
+
+        return if (!proyectoId.isNullOrBlank() && enumEstado != null) {
+            ResponseEntity.ok(contactoRepository.findByProyectoIdAndEstado(proyectoId, enumEstado, pageable))
+        } else if (!proyectoId.isNullOrBlank()) {
             ResponseEntity.ok(contactoRepository.findByProyectoId(proyectoId, pageable))
+        } else if (enumEstado != null) {
+            ResponseEntity.ok(contactoRepository.findByEstado(enumEstado, pageable))
+        } else {
+            ResponseEntity.ok(contactoRepository.findAll(pageable))
         }
     }
 
