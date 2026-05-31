@@ -54,6 +54,11 @@ class SyncController(
         if (!contactoOpt.isPresent) return ResponseEntity.notFound().build()
         val contacto = contactoOpt.get()
 
+        // Verificar si el contacto o la lista han sido cerrados por límite
+        if (contacto.estado == EstadoContacto.CERRADO || contacto.estado == EstadoContacto.CERRADO_POR_INTENTOS) {
+            return ResponseEntity.status(403).body(mapOf("error" to "La lista ha alcanzado su límite o el contacto fue cerrado."))
+        }
+
         val ahora = System.currentTimeMillis()
         val diezMinutos = 10 * 60 * 1000
 
