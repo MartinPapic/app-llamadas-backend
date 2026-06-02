@@ -82,7 +82,7 @@ class AnalyticsController(
         val todasLlamadas = if (proyectoId != null) llamadaRepository.findAll().filter { it.proyectoId == proyectoId }
                             else llamadaRepository.findAll()
                             
-        val llamadasValidas = todasLlamadas.filter { it.intentoValido != false }
+        val llamadasValidas = todasLlamadas.filter { it.intentoValido != false || it.motivo == "GESTION_EXITOSA" }
                             
         val totalLlamadas = todasLlamadas.size.toLong()
         val totalLlamadasValidas = llamadasValidas.size.toLong()
@@ -129,7 +129,7 @@ class AnalyticsController(
         if (proyectoId != null) {
             llamadasDeHoy = llamadasDeHoy.filter { it.proyectoId == proyectoId }
         }
-        val llamadasValidasDeHoy = llamadasDeHoy.filter { it.intentoValido != false }
+        val llamadasValidasDeHoy = llamadasDeHoy.filter { it.intentoValido != false || it.motivo == "GESTION_EXITOSA" }
         val llamadasEmitidasHoyValidas = llamadasValidasDeHoy.size.toLong()
         
         val agentesActivos = llamadasDeHoy.map { it.usuarioId }.distinct().count()
@@ -178,7 +178,7 @@ class AnalyticsController(
     fun getAgentStats(@RequestParam(required = false) proyectoId: String?): ResponseEntity<List<Map<String, Any>>> {
         val llamadasTodas = if (proyectoId != null) llamadaRepository.findAll().filter { it.proyectoId == proyectoId } 
                        else llamadaRepository.findAll()
-        val llamadas = llamadasTodas.filter { it.intentoValido != false }
+        val llamadas = llamadasTodas.filter { it.intentoValido != false || it.motivo == "GESTION_EXITOSA" }
         val stats = llamadas.groupBy { it.usuarioId }.map { (usuarioId, calls) ->
             val total = calls.size
             val efectivos = calls.count { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO }
