@@ -28,7 +28,8 @@ data class MetricasResponse(
     val duracionPromedio: Double,
     val tasaContacto: Double,
     val distribucionTipificaciones: Map<String, Double>,
-    val totalGestionExitosa: Long
+    val totalGestionExitosa: Long,
+    val metaGestionesExitosas: Long
 )
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
@@ -99,6 +100,9 @@ class AnalyticsController(
 
         val totalGestionExitosa = llamadasValidas.count { it.motivo == "GESTION_EXITOSA" }.toLong()
 
+        val listas = if (proyectoId != null) listaRepository.findAll().filter { it.proyectoId == proyectoId } else listaRepository.findAll()
+        val metaGestionesExitosas = listas.sumOf { it.maxGestionExitosa ?: 0 }.toLong()
+
         return ResponseEntity.ok(MetricasResponse(
             totalContactos = totalContactos,
             totalLlamadas = totalLlamadas,
@@ -108,7 +112,8 @@ class AnalyticsController(
             duracionPromedio = durPromedio,
             tasaContacto = tasa,
             distribucionTipificaciones = distribucionTipificaciones,
-            totalGestionExitosa = totalGestionExitosa
+            totalGestionExitosa = totalGestionExitosa,
+            metaGestionesExitosas = metaGestionesExitosas
         ))
     }
 
