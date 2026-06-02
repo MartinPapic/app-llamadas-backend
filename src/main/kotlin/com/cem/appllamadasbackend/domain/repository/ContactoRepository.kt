@@ -23,4 +23,17 @@ interface ContactoRepository : JpaRepository<Contacto, String> {
     fun findByProyectoId(proyectoId: String, pageable: Pageable): Page<Contacto>
     fun findByEstado(estado: EstadoContacto, pageable: Pageable): Page<Contacto>
     fun findByProyectoIdAndEstado(proyectoId: String, estado: EstadoContacto, pageable: Pageable): Page<Contacto>
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("""
+        UPDATE Contacto c 
+        SET c.intentos = 0, c.intentosValidos = 0, c.estado = 'PENDIENTE', c.bloqueadoPor = null, c.fechaBloqueo = null 
+        WHERE (:proyectoId IS NULL OR c.proyectoId = :proyectoId) 
+          AND (:estado IS NULL OR c.estado = :estado)
+          AND (c.estado IN ('CERRADO', 'DESISTIDO', 'CERRADO_POR_INTENTOS') OR c.intentos >= 5 OR c.intentosValidos >= 5)
+    """)
+    fun bulkUnlockContactos(
+        @org.springframework.data.repository.query.Param("proyectoId") proyectoId: String?, 
+        @org.springframework.data.repository.query.Param("estado") estado: EstadoContacto?
+    ): Int
 }

@@ -123,6 +123,31 @@ class SyncController(
         return ResponseEntity.ok(mapOf("success" to true, "message" to "Contacto reiniciado correctamente"))
     }
 
+    // ─── POST /contacts/unlock-bulk — Desbloqueo masivo ────
+    @PostMapping("/contacts/unlock-bulk")
+    @Transactional
+    fun unlockBulkContactos(
+        @RequestParam(required = false) proyectoId: String?,
+        @RequestParam(required = false) estado: String?
+    ): ResponseEntity<Map<String, Any>> {
+        val estadoEnum = estado?.takeIf { it.isNotBlank() }?.let {
+            try {
+                EstadoContacto.valueOf(it)
+            } catch (e: IllegalArgumentException) {
+                null
+            }
+        }
+        val projId = proyectoId?.takeIf { it.isNotBlank() }
+
+        val afectados = contactoRepository.bulkUnlockContactos(projId, estadoEnum)
+
+        return ResponseEntity.ok(mapOf(
+            "success" to true, 
+            "message" to "Se reiniciaron $afectados contactos",
+            "afectados" to afectados
+        ))
+    }
+
     @PostMapping("/sync")
     @Transactional
     fun syncData(
