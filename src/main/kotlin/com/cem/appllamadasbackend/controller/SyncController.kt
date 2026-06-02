@@ -59,6 +59,25 @@ class SyncController(
             return ResponseEntity.status(403).body(mapOf("error" to "La lista ha alcanzado su límite o el contacto fue cerrado."))
         }
 
+        // VALIDACIÓN ESTRICTA: Contar gestiones exitosas actuales
+        val listaId = contacto.listaId
+        if (listaId != null) {
+            val listaOpt = listaRepository.findById(listaId)
+            if (listaOpt.isPresent) {
+                val lista = listaOpt.get()
+                val max = lista.maxGestionExitosa
+                if (max != null && max > 0) {
+                    val exitosas = llamadaRepository.findAll().count { it.listaId == lista.id && it.motivo == "GESTION_EXITOSA" }
+                    if (exitosas >= max) {
+                        // Cerrar el contacto automáticamente para corregir la inconsistencia
+                        contacto.estado = EstadoContacto.CERRADO
+                        contactoRepository.save(contacto)
+                        return ResponseEntity.status(403).body(mapOf("error" to "La lista ya alcanzó su meta máxima de gestiones exitosas."))
+                    }
+                }
+            }
+        }
+
         val ahora = System.currentTimeMillis()
         val diezMinutos = 10 * 60 * 1000
 
