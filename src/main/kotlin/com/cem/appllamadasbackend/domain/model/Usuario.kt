@@ -12,5 +12,6 @@ data class Usuario(
     val passwordHash: String = "",
     @Enumerated(EnumType.STRING)
     val rol: RolUsuario = RolUsuario.AGENTE,
+    @Column(columnDefinition = "boolean default true")
     var activo: Boolean = true
 )
