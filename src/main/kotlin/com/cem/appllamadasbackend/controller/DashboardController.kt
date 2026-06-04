@@ -25,6 +25,12 @@ class DashboardController(
     private val usuarioRepository: UsuarioRepository
 ) {
 
+    @GetMapping
+    fun healthCheck(): ResponseEntity<String> = ResponseEntity.ok("OK")
+
+    @GetMapping("/health")
+    fun healthCheckAlternative(): ResponseEntity<String> = ResponseEntity.ok("OK")
+
 
 
     @GetMapping("/admin/calls")

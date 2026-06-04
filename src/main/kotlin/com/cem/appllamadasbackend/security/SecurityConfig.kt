@@ -25,7 +25,7 @@ class SecurityConfig(private val jwtFilter: JwtFilter) {
             .authorizeHttpRequests { auth ->
                 auth
                     .requestMatchers("/auth/**").permitAll()
-                    .requestMatchers("/actuator/health").permitAll()
+                    .requestMatchers("/", "/health", "/actuator/health").permitAll()
                     .requestMatchers("/error").permitAll()
                     // Rutas de agente (App Móvil)
                     .requestMatchers("/contacts/**", "/contactos/**", "/calls", "/sync", "/encuestas").hasAnyAuthority("ROLE_AGENTE", "ROLE_ADMIN")
