@@ -53,7 +53,7 @@ class AuthController(
      */
     @PostMapping("/login")
     fun login(@RequestBody request: LoginRequest): ResponseEntity<*> {
-        val usuario = usuarioRepository.findByEmail(request.email).orElse(null)
+        val usuario = usuarioRepository.findByEmailAndActivoTrue(request.email).orElse(null)
             ?: return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
                 .body(mapOf("error" to "Credenciales inválidas"))
@@ -123,7 +123,7 @@ class AuthController(
         }
 
         val email = jwtService.extractEmail(request.refreshToken)
-        val usuario = usuarioRepository.findByEmail(email).orElse(null)
+        val usuario = usuarioRepository.findByEmailAndActivoTrue(email).orElse(null)
             ?: return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
                 .body(mapOf("error" to "Usuario no encontrado"))

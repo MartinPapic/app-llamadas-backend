@@ -11,5 +11,6 @@ data class Usuario(
     val email: String = "",
     val passwordHash: String = "",
     @Enumerated(EnumType.STRING)
-    val rol: RolUsuario = RolUsuario.AGENTE
+    val rol: RolUsuario = RolUsuario.AGENTE,
+    var activo: Boolean = true
 )

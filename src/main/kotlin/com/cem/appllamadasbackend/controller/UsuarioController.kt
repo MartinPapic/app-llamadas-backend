@@ -13,7 +13,8 @@ data class UsuarioDTO(
     val id: String,
     val nombre: String,
     val email: String,
-    val rol: String
+    val rol: String,
+    val activo: Boolean
 )
 
 data class CrearUsuarioRequest(
@@ -40,7 +41,7 @@ class UsuarioController(
     @GetMapping
     fun obtenerUsuarios(): ResponseEntity<List<UsuarioDTO>> {
         val usuarios = usuarioRepository.findAll().map { 
-            UsuarioDTO(it.id, it.nombre, it.email, it.rol.name.lowercase()) 
+            UsuarioDTO(it.id, it.nombre, it.email, it.rol.name.lowercase(), it.activo) 
         }
         return ResponseEntity.ok(usuarios)
     }
@@ -71,7 +72,7 @@ class UsuarioController(
         usuarioRepository.save(usuario)
         
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(UsuarioDTO(usuario.id, usuario.nombre, usuario.email, usuario.rol.name.lowercase()))
+            .body(UsuarioDTO(usuario.id, usuario.nombre, usuario.email, usuario.rol.name.lowercase(), usuario.activo))
     }
 
     @PutMapping("/{id}")
@@ -117,21 +118,30 @@ class UsuarioController(
                 usuarioActualizado.id, 
                 usuarioActualizado.nombre, 
                 usuarioActualizado.email, 
-                usuarioActualizado.rol.name.lowercase()
+                usuarioActualizado.rol.name.lowercase(),
+                usuarioActualizado.activo
             )
         )
     }
 
     @DeleteMapping("/{id}")
-    fun eliminarUsuario(@PathVariable id: String): ResponseEntity<*> {
+    fun desactivarUsuario(@PathVariable id: String): ResponseEntity<*> {
         val usuario = usuarioRepository.findById(id).orElse(null)
             ?: return ResponseEntity.status(HttpStatus.NOT_FOUND).body(mapOf("error" to "Usuario no encontrado"))
         
-        try {
-            usuarioRepository.delete(usuario)
-            return ResponseEntity.ok(mapOf("mensaje" to "Usuario eliminado correctamente"))
-        } catch (e: Exception) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(mapOf("error" to "No se puede eliminar el usuario porque tiene registros dependientes (llamadas, encuestas)."))
-        }
+        usuario.activo = false
+        usuarioRepository.save(usuario)
+        return ResponseEntity.ok(mapOf("mensaje" to "Usuario desactivado correctamente"))
+    }
+
+    @PostMapping("/{id}/reactivar")
+    fun reactivarUsuario(@PathVariable id: String): ResponseEntity<*> {
+        val usuario = usuarioRepository.findById(id).orElse(null)
+            ?: return ResponseEntity.status(HttpStatus.NOT_FOUND).body(mapOf("error" to "Usuario no encontrado"))
+        
+        usuario.activo = true
+        usuarioRepository.save(usuario)
+        return ResponseEntity.ok(mapOf("mensaje" to "Usuario reactivado correctamente"))
     }
 }
+

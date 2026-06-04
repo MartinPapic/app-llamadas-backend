@@ -1,5 +1,6 @@
 package com.cem.appllamadasbackend.security
 
+import com.cem.appllamadasbackend.domain.repository.UsuarioRepository
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -11,7 +12,10 @@ import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 
 @Component
-class JwtFilter(private val jwtService: JwtService) : OncePerRequestFilter() {
+class JwtFilter(
+    private val jwtService: JwtService,
+    private val usuarioRepository: UsuarioRepository
+) : OncePerRequestFilter() {
 
     override fun doFilterInternal(
         request: HttpServletRequest,
@@ -33,6 +37,14 @@ class JwtFilter(private val jwtService: JwtService) : OncePerRequestFilter() {
         }
 
         val email = jwtService.extractEmail(token)
+
+        // Revocación inmediata: verificar que el usuario exista y esté activo
+        val usuario = usuarioRepository.findByEmailAndActivoTrue(email).orElse(null)
+        if (usuario == null) {
+            filterChain.doFilter(request, response)
+            return  // No setea SecurityContext → resultará en 401
+        }
+
         val rol   = jwtService.extractRol(token)
         val authName = "ROLE_${rol.uppercase()}"
 
