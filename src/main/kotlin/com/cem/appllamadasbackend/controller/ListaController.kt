@@ -24,8 +24,11 @@ class ListaController(
 ) {
 
     @GetMapping("/proyecto/{proyectoId}")
-    fun listarPorProyecto(@PathVariable proyectoId: String): ResponseEntity<List<Lista>> =
-        ResponseEntity.ok(listaRepository.findAllByProyectoId(proyectoId))
+    fun listarPorProyecto(@PathVariable proyectoId: String): ResponseEntity<List<Lista>> {
+        val listas = listaRepository.findAllByProyectoId(proyectoId)
+        listas.forEach { it.totalContactos = contactoRepository.countByListaId(it.id) }
+        return ResponseEntity.ok(listas)
+    }
 
     @PostMapping
     fun crear(@RequestBody lista: Lista): ResponseEntity<Lista> {

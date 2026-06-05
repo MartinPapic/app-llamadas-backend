@@ -20,6 +20,9 @@ interface ContactoRepository : JpaRepository<Contacto, String> {
     @Query("SELECT c.estado AS estado, COUNT(c) AS cantidad FROM Contacto c GROUP BY c.estado")
     fun countByEstado(): List<EstadoDistribucion>
 
+    fun countByListaId(listaId: String): Long
+
+
     fun findByProyectoId(proyectoId: String, pageable: Pageable): Page<Contacto>
     fun findByEstado(estado: EstadoContacto, pageable: Pageable): Page<Contacto>
     fun findByProyectoIdAndEstado(proyectoId: String, estado: EstadoContacto, pageable: Pageable): Page<Contacto>
