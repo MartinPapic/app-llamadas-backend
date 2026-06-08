@@ -68,6 +68,8 @@ class ListaController(
 
     @DeleteMapping("/{id}")
     fun eliminar(@PathVariable id: String): ResponseEntity<Void> {
+        llamadaRepository.deleteByListaId(id)
+        contactoRepository.deleteByListaId(id)
         listaRepository.deleteById(id)
         return ResponseEntity.noContent().build()
     }

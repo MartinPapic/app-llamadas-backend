@@ -23,4 +23,8 @@ interface LlamadaRepository : JpaRepository<Llamada, String> {
 
     @Query("SELECT COUNT(DISTINCT l.usuarioId) FROM Llamada l WHERE l.fechaInicio >= :inicioDia")
     fun countAgentesActivosDesde(inicioDia: Long): Long
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.transaction.annotation.Transactional
+    fun deleteByListaId(listaId: String)
 }

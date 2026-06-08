@@ -21,6 +21,10 @@ interface ContactoRepository : JpaRepository<Contacto, String> {
     fun countByEstado(): List<EstadoDistribucion>
 
     fun countByListaId(listaId: String): Long
+    
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.transaction.annotation.Transactional
+    fun deleteByListaId(listaId: String)
 
 
     fun findByProyectoId(proyectoId: String, pageable: Pageable): Page<Contacto>
