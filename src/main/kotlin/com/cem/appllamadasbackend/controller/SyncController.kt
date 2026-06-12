@@ -91,6 +91,10 @@ class SyncController(
              return ResponseEntity.status(409).body(mapOf("error" to "Contacto ocupado por otro agente"))
         }
 
+        if (contacto.agenteId != null && contacto.agenteId != usuario.id) {
+             return ResponseEntity.status(409).body(mapOf("error" to "Este contacto ya fue gestionado y asignado a otro agente."))
+        }
+
         // Adquirir bloqueo
         contacto.bloqueadoPor = usuario.id
         contacto.fechaBloqueo = ahora
@@ -113,6 +117,7 @@ class SyncController(
         contacto.intentosValidos = 0
         contacto.intentos = 0
         contacto.estado = EstadoContacto.PENDIENTE
+        contacto.agenteId = null
         
         // Liberar bloqueos de pool por si acaso
         contacto.bloqueadoPor = null
@@ -198,6 +203,10 @@ class SyncController(
                             contacto.estado = EstadoContacto.CERRADO_POR_INTENTOS
                         } else if (contacto.estado == EstadoContacto.PENDIENTE) {
                             contacto.estado = EstadoContacto.EN_GESTION
+                        }
+
+                        if (contacto.agenteId == null && !huboExito && !huboCierreForzado) {
+                            contacto.agenteId = ultimaLlamada?.usuarioId
                         }
 
                         // Actualizar info de última gestión
@@ -306,7 +315,7 @@ class SyncController(
                                   contacto.bloqueadoPor != usuario.id && 
                                   contacto.bloqueadoPor != usuario.email &&
                                   (ahora - (contacto.fechaBloqueo ?: 0L)) < diezMinutos
-            !bloqueadoPorOtro && (contacto.listaId in misListas)
+            !bloqueadoPorOtro && (contacto.listaId in misListas) && (contacto.agenteId == null || contacto.agenteId == usuario.id)
         }
         
         val resultado = todos
@@ -345,7 +354,8 @@ class SyncController(
             contacto.estado != EstadoContacto.CONTACTADO &&
             contacto.estado != EstadoContacto.CERRADO &&
             contacto.estado != EstadoContacto.CERRADO_POR_INTENTOS &&
-            !bloqueadoPorOtro && (contacto.listaId in misListas)
+            !bloqueadoPorOtro && (contacto.listaId in misListas) &&
+            (contacto.agenteId == null || contacto.agenteId == usuario.id)
         }
         return ResponseEntity.ok(pendientes)
     }

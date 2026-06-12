@@ -34,7 +34,7 @@ interface ContactoRepository : JpaRepository<Contacto, String> {
     @org.springframework.data.jpa.repository.Modifying
     @Query("""
         UPDATE Contacto c 
-        SET c.intentos = 0, c.intentosValidos = 0, c.estado = 'PENDIENTE', c.bloqueadoPor = null, c.fechaBloqueo = null 
+        SET c.intentos = 0, c.intentosValidos = 0, c.estado = 'PENDIENTE', c.bloqueadoPor = null, c.fechaBloqueo = null, c.agenteId = null 
         WHERE (:proyectoId IS NULL OR c.proyectoId = :proyectoId) 
           AND (:estado IS NULL OR c.estado = :estado)
           AND (c.estado IN ('CERRADO', 'DESISTIDO', 'CERRADO_POR_INTENTOS') OR c.intentos >= 5 OR c.intentosValidos >= 5)
