@@ -185,7 +185,8 @@ class AnalyticsController(
             val noEfectivos = calls.count { it.resultado == ResultadoLlamada.CONTACTADO_NO_EFECTIVO }
             val noContestan = calls.count { it.resultado == ResultadoLlamada.NO_CONTACTADO }
             val gestionExitosa = calls.count { it.motivo == "GESTION_EXITOSA" }
-            val llamadasCortas = calls.count { it.resultado == ResultadoLlamada.NO_CONTACTADO && (it.duracion ?: 0) < 15 }
+            val excludedTipificaciones = listOf("Teléfono Apagado", "Número no existe", "Fuera de Servicio", "Número no corresponde")
+            val llamadasCortas = calls.count { it.resultado == ResultadoLlamada.NO_CONTACTADO && (it.duracion ?: 0) < 15 && it.tipificacion !in excludedTipificaciones }
             val duracionAvg = if (total > 0) calls.mapNotNull { it.duracion }.average() else 0.0
             
             mapOf(
