@@ -25,5 +25,6 @@ data class Contacto(
     var intentosValidos: Int? = 0,
     var agenteId: String? = null,
     var bloqueadoPor: String? = null,
-    var fechaBloqueo: Long? = null
+    var fechaBloqueo: Long? = null,
+    var fechaUltimaGestion: Long? = null
 )

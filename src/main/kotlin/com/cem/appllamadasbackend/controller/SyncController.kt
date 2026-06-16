@@ -55,8 +55,11 @@ class SyncController(
         val contacto = contactoOpt.get()
 
         // Verificar si el contacto o la lista han sido cerrados por límite
-        if (contacto.estado == EstadoContacto.CERRADO || contacto.estado == EstadoContacto.CERRADO_POR_INTENTOS) {
-            return ResponseEntity.status(403).body(mapOf("error" to "La lista ha alcanzado su límite o el contacto fue cerrado."))
+        if (contacto.estado == EstadoContacto.CERRADO || 
+            contacto.estado == EstadoContacto.CERRADO_POR_INTENTOS || 
+            contacto.estado == EstadoContacto.CONTACTADO || 
+            contacto.estado == EstadoContacto.DESISTIDO) {
+            return ResponseEntity.status(403).body(mapOf("error" to "El contacto ya fue gestionado exitosamente, desistido, o cerrado."))
         }
 
         // VALIDACIÓN ESTRICTA: Contar gestiones exitosas actuales
@@ -213,6 +216,7 @@ class SyncController(
                         if (ultimaLlamada != null) {
                             contacto.ultimaTipificacion = ultimaLlamada.tipificacion
                             contacto.ultimaObservacion = ultimaLlamada.observacion
+                            contacto.fechaUltimaGestion = ultimaLlamada.fechaFin ?: ultimaLlamada.fechaInicio
                         }
 
                         // Liberar bloqueo tras sync exitoso
