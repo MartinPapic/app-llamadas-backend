@@ -74,7 +74,7 @@ class AnalyticsController(
     private val listaRepository: ListaRepository
 ) {
 
-    @GetMapping("/metrics")
+    @GetMapping("/analytics/metrics")
     fun getMetricas(@RequestParam(required = false) proyectoId: String?): ResponseEntity<MetricasResponse> {
         val totalContactos = if (proyectoId != null) contactoRepository.findAll().count { it.proyectoId == proyectoId }.toLong() 
                             else contactoRepository.count()
