@@ -21,6 +21,8 @@ interface ContactoRepository : JpaRepository<Contacto, String> {
     fun countByEstado(): List<EstadoDistribucion>
 
     fun countByListaId(listaId: String): Long
+    fun countByListaIdAndEstado(listaId: String, estado: EstadoContacto): Long
+    fun countByListaIdAndAgenteId(listaId: String, agenteId: String): Long
     
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.transaction.annotation.Transactional
@@ -43,4 +45,16 @@ interface ContactoRepository : JpaRepository<Contacto, String> {
         @org.springframework.data.repository.query.Param("proyectoId") proyectoId: String?, 
         @org.springframework.data.repository.query.Param("estado") estado: EstadoContacto?
     ): Int
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query(value = """
+        UPDATE contacto 
+        SET estado = 'PENDIENTE', 
+            agente_id = NULL, 
+            bloqueado_por = NULL, 
+            fecha_bloqueo = NULL 
+        WHERE estado = 'EN_GESTION' 
+          AND (ultima_tipificacion NOT ILIKE 'llamar m%s tarde' OR ultima_tipificacion IS NULL)
+    """, nativeQuery = true)
+    fun unlockDailyContacts(): Int
 }

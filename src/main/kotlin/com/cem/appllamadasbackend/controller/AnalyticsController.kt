@@ -32,6 +32,20 @@ data class MetricasResponse(
     val metaGestionesExitosas: Long
 )
 
+data class AgentListProgress(
+    val listaId: String,
+    val listaNombre: String,
+    val totalAsignado: Long,
+    val totalPendientes: Long,
+    val totalGestionadosPorEsteAgente: Long
+)
+
+data class AgentProgressResponse(
+    val agenteId: String,
+    val agenteNombre: String,
+    val listas: List<AgentListProgress>
+)
+
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 data class ExportDataDto(
     val event_id: String,
@@ -71,7 +85,8 @@ class AnalyticsController(
     private val llamadaRepository: LlamadaRepository,
     private val usuarioRepository: UsuarioRepository,
     private val proyectoRepository: ProyectoRepository,
-    private val listaRepository: ListaRepository
+    private val listaRepository: ListaRepository,
+    private val usuarioListaRepository: com.cem.appllamadasbackend.domain.repository.UsuarioListaRepository
 ) {
 
     @GetMapping("/analytics/metrics")
@@ -202,6 +217,45 @@ class AnalyticsController(
             )
         }
         return ResponseEntity.ok(stats)
+    }
+
+    @GetMapping("/analytics/agent-progress")
+    fun getAgentProgress(): ResponseEntity<List<AgentProgressResponse>> {
+        val agentes = usuarioRepository.findAll().filter { it.rol == com.cem.appllamadasbackend.domain.model.RolUsuario.AGENTE }
+        val responseList = mutableListOf<AgentProgressResponse>()
+
+        for (agente in agentes) {
+            val asignaciones = usuarioListaRepository.findAllByUsuarioId(agente.id)
+            val listProgresses = mutableListOf<AgentListProgress>()
+
+            for (asignacion in asignaciones) {
+                val lista = listaRepository.findById(asignacion.listaId).orElse(null) ?: continue
+                
+                val totalAsignado = contactoRepository.countByListaId(lista.id)
+                val totalPendientes = contactoRepository.countByListaIdAndEstado(lista.id, com.cem.appllamadasbackend.domain.model.EstadoContacto.PENDIENTE)
+                val totalGestionados = contactoRepository.countByListaIdAndAgenteId(lista.id, agente.id)
+
+                listProgresses.add(
+                    AgentListProgress(
+                        listaId = lista.id,
+                        listaNombre = lista.nombre,
+                        totalAsignado = totalAsignado,
+                        totalPendientes = totalPendientes,
+                        totalGestionadosPorEsteAgente = totalGestionados
+                    )
+                )
+            }
+            
+            responseList.add(
+                AgentProgressResponse(
+                    agenteId = agente.id,
+                    agenteNombre = agente.nombre,
+                    listas = listProgresses
+                )
+            )
+        }
+
+        return ResponseEntity.ok(responseList)
     }
 
     @GetMapping("/analytics/export")
