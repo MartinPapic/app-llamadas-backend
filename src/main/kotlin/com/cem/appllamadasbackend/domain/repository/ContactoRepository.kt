@@ -14,6 +14,14 @@ interface EstadoDistribucion {
     val cantidad: Long
 }
 
+interface ListProgressDto {
+    val proyectoNombre: String?
+    val listaNombre: String?
+    val enGestion: Long
+    val pendientes: Long
+    val totalContactos: Long
+}
+
 @Repository
 interface ContactoRepository : JpaRepository<Contacto, String> {
 
@@ -32,6 +40,21 @@ interface ContactoRepository : JpaRepository<Contacto, String> {
     fun findByProyectoId(proyectoId: String, pageable: Pageable): Page<Contacto>
     fun findByEstado(estado: EstadoContacto, pageable: Pageable): Page<Contacto>
     fun findByProyectoIdAndEstado(proyectoId: String, estado: EstadoContacto, pageable: Pageable): Page<Contacto>
+
+    @Query(value = """
+        SELECT 
+            p.nombre as proyectoNombre, 
+            l.nombre as listaNombre,
+            SUM(CASE WHEN c.estado = 'EN_GESTION' THEN 1 ELSE 0 END) as enGestion,
+            SUM(CASE WHEN c.estado = 'PENDIENTE' THEN 1 ELSE 0 END) as pendientes,
+            COUNT(c.id) as totalContactos
+        FROM contacto c
+        JOIN lista l ON c.lista_id = l.id
+        JOIN proyecto p ON l.proyecto_id = p.id
+        GROUP BY p.nombre, l.nombre
+        ORDER BY p.nombre, l.nombre
+    """, nativeQuery = true)
+    fun getListProgress(): List<ListProgressDto>
 
     @org.springframework.data.jpa.repository.Modifying
     @Query("""

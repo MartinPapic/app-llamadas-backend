@@ -46,6 +46,18 @@ data class AgentProgressResponse(
     val listas: List<AgentListProgress>
 )
 
+data class ProjectListProgress(
+    val listaNombre: String,
+    val enGestion: Long,
+    val pendientes: Long,
+    val totalContactos: Long
+)
+
+data class ProjectProgressResponse(
+    val proyectoNombre: String,
+    val listas: List<ProjectListProgress>
+)
+
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 data class ExportDataDto(
     val event_id: String,
@@ -256,6 +268,30 @@ class AnalyticsController(
         }
 
         return ResponseEntity.ok(responseList)
+    }
+
+    @GetMapping("/analytics/list-progress")
+    fun getListProgress(): ResponseEntity<List<ProjectProgressResponse>> {
+        val rawData = contactoRepository.getListProgress()
+        
+        // Group by project name
+        val groupedData = rawData.groupBy { it.proyectoNombre ?: "Sin Proyecto" }
+        
+        val response = groupedData.map { (proyectoNombre, listas) ->
+            ProjectProgressResponse(
+                proyectoNombre = proyectoNombre,
+                listas = listas.map { lista ->
+                    ProjectListProgress(
+                        listaNombre = lista.listaNombre ?: "Sin Nombre",
+                        enGestion = lista.enGestion,
+                        pendientes = lista.pendientes,
+                        totalContactos = lista.totalContactos
+                    )
+                }
+            )
+        }
+        
+        return ResponseEntity.ok(response)
     }
 
     @GetMapping("/analytics/export")
