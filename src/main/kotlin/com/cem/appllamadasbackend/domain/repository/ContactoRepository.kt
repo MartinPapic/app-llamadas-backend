@@ -28,6 +28,11 @@ interface ContactoRepository : JpaRepository<Contacto, String> {
     @Query("SELECT c.estado AS estado, COUNT(c) AS cantidad FROM Contacto c GROUP BY c.estado")
     fun countByEstado(): List<EstadoDistribucion>
 
+    @Query("SELECT c.estado AS estado, COUNT(c) AS cantidad FROM Contacto c WHERE c.proyectoId = :proyectoId GROUP BY c.estado")
+    fun countByEstadoAndProyectoId(@org.springframework.data.repository.query.Param("proyectoId") proyectoId: String): List<EstadoDistribucion>
+
+    fun countByProyectoId(proyectoId: String): Long
+
     fun countByListaId(listaId: String): Long
     fun countByListaIdAndEstado(listaId: String, estado: EstadoContacto): Long
     fun countByListaIdAndAgenteId(listaId: String, agenteId: String): Long

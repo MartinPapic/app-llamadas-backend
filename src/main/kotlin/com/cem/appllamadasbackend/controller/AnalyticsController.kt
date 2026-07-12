@@ -103,43 +103,33 @@ class AnalyticsController(
 
     @GetMapping("/analytics/metrics")
     fun getMetricas(@RequestParam(required = false) proyectoId: String?): ResponseEntity<MetricasResponse> {
-        val totalContactos = if (proyectoId != null) contactoRepository.findAll().count { it.proyectoId == proyectoId }.toLong() 
-                            else contactoRepository.count()
+        val totalContactos = if (proyectoId != null) contactoRepository.countByProyectoId(proyectoId) 
+                             else contactoRepository.count()
+                             
+        val metricasSQL = llamadaRepository.getMetricasGenerales(proyectoId)
+        val distribucionSQL = llamadaRepository.getDistribucionTipificaciones(proyectoId)
         
-        val todasLlamadas = if (proyectoId != null) llamadaRepository.findAll().filter { it.proyectoId == proyectoId }
-                            else llamadaRepository.findAll()
-                            
-        val llamadasValidas = todasLlamadas.filter { it.intentoValido != false || it.motivo == "GESTION_EXITOSA" }
-                            
-        val totalLlamadas = todasLlamadas.size.toLong()
-        val totalLlamadasValidas = llamadasValidas.size.toLong()
-        val contestan = llamadasValidas.count { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO || it.resultado == ResultadoLlamada.CONTACTADO_NO_EFECTIVO }.toLong()
-        val noContestan = llamadasValidas.count { it.resultado == ResultadoLlamada.NO_CONTACTADO }.toLong()
-        val durPromedio = llamadasValidas.mapNotNull { it.duracion }.let {
-            if (it.isEmpty()) 0.0 else it.average()
+        val totalLlamadasValidas = metricasSQL.llamadasValidas ?: 0L
+        val durPromedio = if (metricasSQL.duracionConteo > 0) metricasSQL.duracionSuma.toDouble() / metricasSQL.duracionConteo else 0.0
+        val tasa = if (totalLlamadasValidas > 0) (metricasSQL.contestanEfectivos.toDouble() / totalLlamadasValidas) * 100 else 0.0
+        
+        val distribucionTipificaciones = distribucionSQL.associate { 
+            (it.tipificacion ?: "Desconocida") to (if (totalLlamadasValidas > 0) (it.cantidad.toDouble() / totalLlamadasValidas) * 100 else 0.0)
         }
-        val contestanEfectivos = llamadasValidas.count { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO }.toDouble()
-        val tasa = if (totalLlamadasValidas > 0) (contestanEfectivos / totalLlamadasValidas) * 100 else 0.0
-
-        val distribucionTipificaciones = llamadasValidas.filter { it.tipificacion != null }
-            .groupBy { it.tipificacion!! }
-            .mapValues { (_, v) -> if (totalLlamadasValidas > 0) (v.size.toDouble() / totalLlamadasValidas) * 100 else 0.0 }
-
-        val totalGestionExitosa = llamadasValidas.count { it.motivo == "GESTION_EXITOSA" }.toLong()
 
         val listas = if (proyectoId != null) listaRepository.findAll().filter { it.proyectoId == proyectoId } else listaRepository.findAll()
         val metaGestionesExitosas = listas.sumOf { it.maxGestionExitosa ?: 0 }.toLong()
 
         return ResponseEntity.ok(MetricasResponse(
             totalContactos = totalContactos,
-            totalLlamadas = totalLlamadas,
+            totalLlamadas = metricasSQL.totalLlamadas ?: 0L,
             totalLlamadasValidas = totalLlamadasValidas,
-            totalContestan = contestan,
-            totalNoContestan = noContestan,
+            totalContestan = metricasSQL.contestan ?: 0L,
+            totalNoContestan = metricasSQL.noContestan ?: 0L,
             duracionPromedio = durPromedio,
             tasaContacto = tasa,
             distribucionTipificaciones = distribucionTipificaciones,
-            totalGestionExitosa = totalGestionExitosa,
+            totalGestionExitosa = metricasSQL.totalGestionExitosa ?: 0L,
             metaGestionesExitosas = metaGestionesExitosas
         ))
     }
@@ -152,17 +142,14 @@ class AnalyticsController(
         val date = fecha?.let { try { LocalDate.parse(it) } catch (e: Exception) { LocalDate.now(ZoneId.of("America/Santiago")) } } ?: LocalDate.now(ZoneId.of("America/Santiago"))
         val startOfDay = date.atStartOfDay(ZoneId.of("America/Santiago")).toInstant().toEpochMilli()
 
-        var llamadasDeHoy = llamadaRepository.findAll().filter { it.fechaInicio >= startOfDay }
-        if (proyectoId != null) {
-            llamadasDeHoy = llamadasDeHoy.filter { it.proyectoId == proyectoId }
+        val stats = llamadaRepository.getRealtimeMetricsStats(proyectoId, startOfDay)
+        val distribucion = llamadaRepository.getRealtimeDistribucion(proyectoId, startOfDay).associate {
+            (it.resultado ?: "UNKNOWN") to it.cantidad
         }
-        val llamadasValidasDeHoy = llamadasDeHoy.filter { it.intentoValido != false || it.motivo == "GESTION_EXITOSA" }
-        val llamadasEmitidasHoyValidas = llamadasValidasDeHoy.size.toLong()
+        val agentesActivos = llamadaRepository.countAgentesActivosRealtime(proyectoId, startOfDay)
         
-        val agentesActivos = llamadasDeHoy.map { it.usuarioId }.distinct().count()
-        val distribucion = llamadasValidasDeHoy.groupBy { it.resultado?.name ?: "UNKNOWN" }.mapValues { it.value.size.toLong() }
-        
-        val contestan = (distribucion[ResultadoLlamada.CONTACTADO_EFECTIVO.name] ?: 0L) + (distribucion[ResultadoLlamada.CONTACTADO_NO_EFECTIVO.name] ?: 0L)
+        val llamadasEmitidasHoyValidas = stats.llamadasEmitidasHoyValidas ?: 0L
+        val contestan = (stats.contactadoEfectivo ?: 0L) + (stats.contactadoNoEfectivo ?: 0L)
         val tasaContactabilidad = if (llamadasEmitidasHoyValidas > 0) (contestan.toDouble() / llamadasEmitidasHoyValidas) * 100 else 0.0
 
         val response = mapOf(
@@ -170,7 +157,7 @@ class AnalyticsController(
             "tasaContactabilidadDiaria" to tasaContactabilidad,
             "distribucionResultados" to distribucion,
             "totalAgentesActivos" to agentesActivos,
-            "gestionExitosaHoy" to llamadasValidasDeHoy.count { it.motivo == "GESTION_EXITOSA" }
+            "gestionExitosaHoy" to (stats.gestionExitosaHoy ?: 0L)
         )
 
         return ResponseEntity.ok(response)
@@ -178,20 +165,12 @@ class AnalyticsController(
 
     @GetMapping("/analytics/funnel")
     fun getFunnel(@RequestParam(required = false) proyectoId: String?): ResponseEntity<Map<String, Any>> {
-        val totalBase = if (proyectoId != null) {
-            contactoRepository.findAll().count { it.proyectoId == proyectoId }.toLong()
-        } else {
-            contactoRepository.count()
-        }
+        val totalBase = if (proyectoId != null) contactoRepository.countByProyectoId(proyectoId) else contactoRepository.count()
         
-        val baseContactos = if (proyectoId != null) {
-            contactoRepository.findAll().filter { it.proyectoId == proyectoId }
-        } else {
-            contactoRepository.findAll()
-        }
-        
-        val estadosMap = baseContactos.groupBy { it.estado.name }
-                                     .mapValues { it.value.size.toLong() }
+        val distribucion = if (proyectoId != null) contactoRepository.countByEstadoAndProyectoId(proyectoId) 
+                           else contactoRepository.countByEstado()
+                           
+        val estadosMap = distribucion.associate { it.estado.name to it.cantidad }
 
         val response = mapOf(
             "totalBase" to totalBase,
@@ -203,31 +182,22 @@ class AnalyticsController(
 
     @GetMapping("/analytics/agents")
     fun getAgentStats(@RequestParam(required = false) proyectoId: String?): ResponseEntity<List<Map<String, Any>>> {
-        val llamadasTodas = if (proyectoId != null) llamadaRepository.findAll().filter { it.proyectoId == proyectoId } 
-                       else llamadaRepository.findAll()
-        val llamadas = llamadasTodas.filter { it.intentoValido != false || it.motivo == "GESTION_EXITOSA" }
-        val stats = llamadas.groupBy { it.usuarioId }.map { (usuarioId, calls) ->
-            val total = calls.size
-            val efectivos = calls.count { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO }
-            val noEfectivos = calls.count { it.resultado == ResultadoLlamada.CONTACTADO_NO_EFECTIVO }
-            val noContestan = calls.count { it.resultado == ResultadoLlamada.NO_CONTACTADO }
-            val gestionExitosa = calls.count { it.motivo == "GESTION_EXITOSA" }
-            val excludedTipificaciones = listOf("Teléfono Apagado", "Número no existe", "Fuera de Servicio", "Número no corresponde")
-            val llamadasCortas = calls.count { it.resultado == ResultadoLlamada.NO_CONTACTADO && (it.duracion ?: 0) < 15 && it.tipificacion !in excludedTipificaciones }
-            val duracionAvg = if (total > 0) calls.mapNotNull { it.duracion }.average() else 0.0
-            
+        val statsSQL = llamadaRepository.getAgentStats(proyectoId)
+        
+        val stats = statsSQL.map { 
             mapOf(
-                "agenteId" to usuarioId,
-                "totalLlamadas" to total,
-                "efectivos" to efectivos,
-                "noEfectivos" to noEfectivos,
-                "noContestan" to noContestan,
-                "gestionExitosa" to gestionExitosa,
-                "llamadasCortas" to llamadasCortas,
-                "duracionPromedio" to duracionAvg,
-                "tasaEfectividad" to if (total > 0) (efectivos.toDouble() / total) * 100 else 0.0
+                "agenteId" to it.agenteId,
+                "totalLlamadas" to it.totalLlamadas,
+                "efectivos" to it.efectivos,
+                "noEfectivos" to it.noEfectivos,
+                "noContestan" to it.noContestan,
+                "gestionExitosa" to it.gestionExitosa,
+                "llamadasCortas" to it.llamadasCortas,
+                "duracionPromedio" to (it.duracionAvg ?: 0.0),
+                "tasaEfectividad" to if (it.totalLlamadas > 0) (it.efectivos.toDouble() / it.totalLlamadas) * 100 else 0.0
             )
         }
+        
         return ResponseEntity.ok(stats)
     }
 
