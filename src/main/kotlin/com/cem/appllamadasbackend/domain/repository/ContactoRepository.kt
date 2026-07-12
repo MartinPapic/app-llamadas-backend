@@ -49,12 +49,30 @@ interface ContactoRepository : JpaRepository<Contacto, String> {
     @org.springframework.data.jpa.repository.Modifying
     @Query(value = """
         UPDATE contacto 
-        SET estado = 'PENDIENTE', 
+        SET 
+            estado = 'PENDIENTE', 
             agente_id = NULL, 
             bloqueado_por = NULL, 
-            fecha_bloqueo = NULL 
+            fecha_bloqueo = NULL,
+            ultima_observacion = CASE 
+                WHEN ultima_tipificacion ILIKE 'llamar m%s tarde' 
+                     AND (EXTRACT(EPOCH FROM NOW()) * 1000 - fecha_ultima_gestion) > 604800000 
+                THEN NULL 
+                ELSE ultima_observacion 
+            END,
+            ultima_tipificacion = CASE 
+                WHEN ultima_tipificacion ILIKE 'llamar m%s tarde' 
+                     AND (EXTRACT(EPOCH FROM NOW()) * 1000 - fecha_ultima_gestion) > 604800000 
+                THEN NULL 
+                ELSE ultima_tipificacion 
+            END
         WHERE estado = 'EN_GESTION' 
-          AND (ultima_tipificacion NOT ILIKE 'llamar m%s tarde' OR ultima_tipificacion IS NULL)
+          AND (
+              (ultima_tipificacion NOT ILIKE 'llamar m%s tarde' OR ultima_tipificacion IS NULL)
+              OR 
+              (ultima_tipificacion ILIKE 'llamar m%s tarde' 
+               AND (EXTRACT(EPOCH FROM NOW()) * 1000 - fecha_ultima_gestion) > 604800000)
+          )
     """, nativeQuery = true)
     fun unlockDailyContacts(): Int
 }
