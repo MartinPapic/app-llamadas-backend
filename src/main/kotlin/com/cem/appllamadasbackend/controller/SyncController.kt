@@ -165,6 +165,11 @@ class SyncController(
         // Filtrar llamadas: Si no están tipificadas, ignorarlas (no cuentan como intento)
         val llamadasTipificadas = payload.llamadas.filter { !it.tipificacion.isNullOrBlank() }
 
+        // Lista de tipificaciones que cierran el caso
+        val tipificacionesCierre = tipificacionRepository.findAll()
+            .filter { it.cierraCaso }
+            .map { it.nombre.uppercase() }
+
         return try {
             // 1. Persistir llamadas validas primero
             if (llamadasTipificadas.isNotEmpty()) {
@@ -183,20 +188,13 @@ class SyncController(
                         
                         val huboExito = llamadasDelContacto.any { it.resultado == ResultadoLlamada.CONTACTADO_EFECTIVO }
                         
-                        // Lista de tipificaciones que cierran el caso
-                        val tipificacionesCierre = tipificacionRepository.findAll()
-                            .filter { it.cierraCaso }
-                            .map { it.nombre.uppercase() }
-                        
                         val huboCierreForzado = llamadasDelContacto.any { 
                             it.tipificacion != null && tipificacionesCierre.contains(it.tipificacion.uppercase()) 
                         }
                         
-                        // Determinar si fue un intento válido (basado en el boolean que manda Android o backend fallback)
-                        val ultimaLlamadaEsValida = ultimaLlamada?.intentoValido ?: true
-                        if (ultimaLlamadaEsValida) {
-                            contacto.intentosValidos = (contacto.intentosValidos ?: 0) + 1
-                        }
+                        // Determinar si fue un intento válido (sumar todas las llamadas validas del payload)
+                        val llamadasValidasNuevas = llamadasDelContacto.count { it.intentoValido ?: true }
+                        contacto.intentosValidos = (contacto.intentosValidos ?: 0) + llamadasValidasNuevas
 
                         if (huboExito) {
                             contacto.estado = EstadoContacto.CONTACTADO
@@ -247,8 +245,9 @@ class SyncController(
             // 4. Verificar topes de gestión exitosa por lista (Bloqueo y Desbloqueo automático)
             try {
                 val todasListas = listaRepository.findAll()
+                val todasLlamadas = llamadaRepository.findAll()
                 todasListas.forEach { lista ->
-                    val exitosas = llamadaRepository.findAll().count { it.listaId == lista.id && it.motivo == "GESTION_EXITOSA" }
+                    val exitosas = todasLlamadas.count { it.listaId == lista.id && it.motivo == "GESTION_EXITOSA" }
                     val max = lista.maxGestionExitosa
                     
                     if (max != null && max > 0 && exitosas >= max) {
@@ -319,7 +318,8 @@ class SyncController(
                                   contacto.bloqueadoPor != usuario.id && 
                                   contacto.bloqueadoPor != usuario.email &&
                                   (ahora - (contacto.fechaBloqueo ?: 0L)) < diezMinutos
-            !bloqueadoPorOtro && (contacto.listaId in misListas) && (contacto.agenteId == null || contacto.agenteId == usuario.id)
+            !bloqueadoPorOtro && (contacto.listaId in misListas) && (contacto.agenteId == null || contacto.agenteId == usuario.id) &&
+            (contacto.intentosValidos ?: 0) < 5
         }
         
         val resultado = todos
@@ -359,7 +359,8 @@ class SyncController(
             contacto.estado != EstadoContacto.CERRADO &&
             contacto.estado != EstadoContacto.CERRADO_POR_INTENTOS &&
             !bloqueadoPorOtro && (contacto.listaId in misListas) &&
-            (contacto.agenteId == null || contacto.agenteId == usuario.id)
+            (contacto.agenteId == null || contacto.agenteId == usuario.id) &&
+            (contacto.intentosValidos ?: 0) < 5
         }
         return ResponseEntity.ok(pendientes)
     }
