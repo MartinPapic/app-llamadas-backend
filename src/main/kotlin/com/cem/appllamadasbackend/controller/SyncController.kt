@@ -342,7 +342,9 @@ class SyncController(
         } else emptyMap()
 
         val conIntentosReales = todos.map { c ->
-            c.intentosValidos = conteosMap[c.id] ?: 0
+            val realCount = conteosMap[c.id]?.toInt() ?: 0
+            c.intentosValidos = realCount
+            c.intentos = realCount
             c
         }.filter { (it.intentosValidos ?: 0) < 5 }
         
@@ -393,7 +395,9 @@ class SyncController(
         } else emptyMap()
 
         val pendientes = pendientesRaw.map { c ->
-            c.intentosValidos = conteosMap[c.id] ?: 0
+            val realCount = conteosMap[c.id]?.toInt() ?: 0
+            c.intentosValidos = realCount
+            c.intentos = realCount
             c
         }.filter { (it.intentosValidos ?: 0) < 5 }
 
