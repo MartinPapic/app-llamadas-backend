@@ -45,6 +45,11 @@ interface RealtimeMetricsDTO {
     val gestionExitosaHoy: Long?
 }
 
+interface ConteoIntentosDTO {
+    val contactoId: String
+    val conteo: Long
+}
+
 interface ResultadoDistribucionString {
     val resultado: String?
     val cantidad: Long
@@ -62,6 +67,9 @@ interface LlamadaRepository : JpaRepository<Llamada, String> {
 
     @Query("SELECT COUNT(DISTINCT l.usuarioId) FROM Llamada l WHERE l.fechaInicio >= :inicioDia")
     fun countAgentesActivosDesde(inicioDia: Long): Long
+
+    @Query(value = "SELECT l.contacto_id as contactoId, COUNT(l.id) as conteo FROM llamada l WHERE l.contacto_id IN :contactoIds AND l.intento_valido = true GROUP BY l.contacto_id", nativeQuery = true)
+    fun countIntentosValidosByContactoIds(@org.springframework.data.repository.query.Param("contactoIds") contactoIds: List<String>): List<ConteoIntentosDTO>
 
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.transaction.annotation.Transactional

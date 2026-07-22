@@ -62,6 +62,15 @@ class SyncController(
             return ResponseEntity.status(403).body(mapOf("error" to "El contacto ya fue gestionado exitosamente, desistido, o cerrado."))
         }
 
+        // VALIDACIÓN EN VIVO DE INTENTOS
+        val realAttempts = llamadaRepository.countIntentosValidosByContactoIds(listOf(id)).firstOrNull()?.conteo?.toInt() ?: 0
+        if (realAttempts >= 5) {
+            contacto.estado = EstadoContacto.CERRADO_POR_INTENTOS
+            contacto.intentosValidos = realAttempts
+            contactoRepository.save(contacto)
+            return ResponseEntity.status(403).body(mapOf("error" to "El contacto ya superó el límite de 5 intentos."))
+        }
+
         // VALIDACIÓN ESTRICTA: Contar gestiones exitosas actuales
         val listaId = contacto.listaId
         if (listaId != null) {
@@ -176,6 +185,12 @@ class SyncController(
                 llamadaRepository.saveAll(llamadasTipificadas)
             }
 
+            // 1.5 Obtener conteos reales actualizados de la base de datos
+            val contactosInvolucrados = llamadasTipificadas.map { it.contactoId }.distinct()
+            val conteosReales = if (contactosInvolucrados.isNotEmpty()) {
+                llamadaRepository.countIntentosValidosByContactoIds(contactosInvolucrados).associate { it.contactoId to it.conteo.toInt() }
+            } else emptyMap()
+
             // 2. Control Server-Side de estados
             if (llamadasTipificadas.isNotEmpty()) {
                 llamadasTipificadas.groupBy { it.contactoId }.forEach { (contactoId, llamadasDelContacto) ->
@@ -192,9 +207,8 @@ class SyncController(
                             it.tipificacion != null && tipificacionesCierre.contains(it.tipificacion.uppercase()) 
                         }
                         
-                        // Determinar si fue un intento válido (sumar todas las llamadas validas del payload)
-                        val llamadasValidasNuevas = llamadasDelContacto.count { it.intentoValido ?: true }
-                        contacto.intentosValidos = (contacto.intentosValidos ?: 0) + llamadasValidasNuevas
+                        // Usar el conteo real directo de la DB para ser invulnerables a fallos del cliente
+                        contacto.intentosValidos = conteosReales[contactoId] ?: 0
 
                         if (huboExito) {
                             contacto.estado = EstadoContacto.CONTACTADO
@@ -318,11 +332,21 @@ class SyncController(
                                   contacto.bloqueadoPor != usuario.id && 
                                   contacto.bloqueadoPor != usuario.email &&
                                   (ahora - (contacto.fechaBloqueo ?: 0L)) < diezMinutos
-            !bloqueadoPorOtro && (contacto.listaId in misListas) && (contacto.agenteId == null || contacto.agenteId == usuario.id) &&
-            (contacto.intentosValidos ?: 0) < 5
+            !bloqueadoPorOtro && (contacto.listaId in misListas) && (contacto.agenteId == null || contacto.agenteId == usuario.id)
         }
         
-        val resultado = todos
+        // Obtener conteos reales y sobreescribir el campo para limpiar datos corruptos en el teléfono del agente
+        val ids = todos.map { it.id }
+        val conteosMap = if (ids.isNotEmpty()) {
+            llamadaRepository.countIntentosValidosByContactoIds(ids).associate { it.contactoId to it.conteo.toInt() }
+        } else emptyMap()
+
+        val conIntentosReales = todos.map { c ->
+            c.intentosValidos = conteosMap[c.id] ?: 0
+            c
+        }.filter { (it.intentosValidos ?: 0) < 5 }
+        
+        val resultado = conIntentosReales
             .let { if (proyectoId != null) it.filter { c -> c.proyectoId == proyectoId } else it }
             .let { if (estado != null) it.filter { c -> c.estado.name.equals(estado, ignoreCase = true) } else it }
 
@@ -348,7 +372,7 @@ class SyncController(
 
         val misListas = usuarioListaRepository.findAllByUsuarioId(usuario.id).map { it.listaId }.toSet()
 
-        val pendientes = contactoRepository.findAll().filter { contacto ->
+        val pendientesRaw = contactoRepository.findAll().filter { contacto ->
             val bloqueadoPorOtro = contacto.bloqueadoPor != null && 
                                   contacto.bloqueadoPor != usuario.id && 
                                   contacto.bloqueadoPor != usuario.email &&
@@ -359,9 +383,20 @@ class SyncController(
             contacto.estado != EstadoContacto.CERRADO &&
             contacto.estado != EstadoContacto.CERRADO_POR_INTENTOS &&
             !bloqueadoPorOtro && (contacto.listaId in misListas) &&
-            (contacto.agenteId == null || contacto.agenteId == usuario.id) &&
-            (contacto.intentosValidos ?: 0) < 5
+            (contacto.agenteId == null || contacto.agenteId == usuario.id)
         }
+
+        // Obtener conteos reales y sobreescribir para corregir la app del agente
+        val ids = pendientesRaw.map { it.id }
+        val conteosMap = if (ids.isNotEmpty()) {
+            llamadaRepository.countIntentosValidosByContactoIds(ids).associate { it.contactoId to it.conteo.toInt() }
+        } else emptyMap()
+
+        val pendientes = pendientesRaw.map { c ->
+            c.intentosValidos = conteosMap[c.id] ?: 0
+            c
+        }.filter { (it.intentosValidos ?: 0) < 5 }
+
         return ResponseEntity.ok(pendientes)
     }
 
